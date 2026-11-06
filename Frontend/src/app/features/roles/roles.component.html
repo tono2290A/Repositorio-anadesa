@@ -1,0 +1,105 @@
+<app-layout>
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h5 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Roles y Permisos</h5>
+      <button class="btn btn-primary-brand" (click)="abrirFormulario()">
+        <i class="fas fa-plus me-1"></i>Nuevo Rol
+      </button>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead class="table-light">
+            <tr>
+              <th>Nombre</th>
+              <th>Descripcion</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of roles">
+              <td><strong>{{ r.nombre }}</strong></td>
+              <td>{{ r.descripcion }}</td>
+              <td>
+                <span class="badge" [class.bg-success]="r.estado" [class.bg-danger]="!r.estado">
+                  {{ r.estado ? 'Activo' : 'Inactivo' }}
+                </span>
+              </td>
+              <td>
+                <button class="btn btn-sm btn-outline-primary me-1" (click)="editarPermisos(r)"><i class="fas fa-key"></i></button>
+                <button class="btn btn-sm btn-outline-danger" (click)="eliminar(r)"><i class="fas fa-trash"></i></button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Nuevo Rol -->
+  <div class="modal d-block" *ngIf="mostrarFormulario" style="background: rgba(0,0,0,0.5)">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5>Nuevo Rol</h5>
+          <button class="btn-close" (click)="mostrarFormulario = false"></button>
+        </div>
+        <div class="modal-body">
+          <form (ngSubmit)="crearRol()">
+            <div class="mb-3">
+              <label class="form-label">Nombre *</label>
+              <input type="text" class="form-control" [(ngModel)]="nuevoRol.nombre" name="nombre" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Descripcion</label>
+              <input type="text" class="form-control" [(ngModel)]="nuevoRol.descripcion" name="descripcion">
+            </div>
+            <div class="text-end">
+              <button type="button" class="btn btn-secondary me-2" (click)="mostrarFormulario = false">Cancelar</button>
+              <button type="submit" class="btn btn-primary-brand">Crear</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Permisos -->
+  <div class="modal d-block" *ngIf="mostrarPermisos" style="background: rgba(0,0,0,0.5)">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5>Permisos de: {{ rolSeleccionado?.nombre }}</h5>
+          <button class="btn-close" (click)="mostrarPermisos = false"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <strong>Modulos Asignados:</strong>
+            <div *ngFor="let m of modulos" class="form-check">
+              <input class="form-check-input" type="checkbox" [checked]="modulosSeleccionados.includes(m.id_modulo)" (change)="toggleModulo(m.id_modulo)" [id]="'mod-'+m.id_modulo">
+              <label class="form-check-label" [for]="'mod-'+m.id_modulo">
+                <i class="fas" [ngClass]="m.icono"></i> {{ m.nombre }}
+              </label>
+            </div>
+          </div>
+          <hr>
+          <div *ngFor="let m of modulosSeleccionados" class="mb-3">
+            <strong>Permisos para {{ getNombreModulo(m) }}:</strong>
+            <div *ngFor="let p of permisos" class="form-check ms-3">
+              <input class="form-check-input" type="checkbox"
+                [checked]="esPermisoAsignado(m, p.id_permiso)"
+                (change)="togglePermiso(m, p.id_permiso)"
+                [id]="'perm-'+m+'-'+p.id_permiso">
+              <label class="form-check-label" [for]="'perm-'+m+'-'+p.id_permiso">{{ p.nombre }}</label>
+            </div>
+          </div>
+          <div class="text-end">
+            <button class="btn btn-secondary me-2" (click)="mostrarPermisos = false">Cancelar</button>
+            <button class="btn btn-primary-brand" (click)="guardarPermisos()">Guardar Permisos</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</app-layout>

@@ -1,0 +1,779 @@
+<app-layout>
+  <div class="config-page">
+    <!-- Secondary Sidebar -->
+    <aside class="config-sidebar">
+      <div class="config-sidebar-header">
+        <i class="fas fa-cog"></i>
+        <span>Configuración</span>
+      </div>
+      <nav class="config-nav">
+        <button class="config-nav-item" [class.active]="seccionActiva === 'usuarios'" (click)="cambiarSeccion('usuarios')">
+          <i class="fas fa-users"></i>
+          <span>Usuarios</span>
+        </button>
+        <button class="config-nav-item" [class.active]="seccionActiva === 'roles'" (click)="cambiarSeccion('roles')">
+          <i class="fas fa-shield-alt"></i>
+          <span>Roles</span>
+        </button>
+        <button class="config-nav-item" [class.active]="seccionActiva === 'permisos'" (click)="cambiarSeccion('permisos')">
+          <i class="fas fa-key"></i>
+          <span>Permisos</span>
+        </button>
+        <button class="config-nav-item" [class.active]="seccionActiva === 'grupos'" (click)="cambiarSeccion('grupos')">
+          <i class="fas fa-layer-group"></i>
+          <span>Grupos</span>
+        </button>
+        <button class="config-nav-item" [class.active]="seccionActiva === 'backup'" (click)="cambiarSeccion('backup')">
+          <i class="fas fa-database"></i>
+          <span>Copia de seguridad</span>
+        </button>
+        <button class="config-nav-item" [class.active]="seccionActiva === 'apariencia'" (click)="cambiarSeccion('apariencia')">
+          <i class="fas fa-palette"></i>
+          <span>Apariencia</span>
+        </button>
+      </nav>
+    </aside>
+
+    <!-- Content Area -->
+    <main class="config-content">
+
+      <!-- ========== USUARIOS ========== -->
+      <section *ngIf="seccionActiva === 'usuarios'" class="section-container fade-in">
+        <div class="section-header">
+          <div>
+            <h1 class="section-title">Gestión de Usuarios</h1>
+            <p class="section-subtitle">Administra los usuarios del sistema y sus accesos</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-outline" (click)="toggleOrdenUsuarios()">
+              <i class="fas fa-sort"></i> {{ ordenAsc ? 'A → Z' : 'Z → A' }}
+            </button>
+            <button class="btn btn-navy" (click)="abrirCrearUsuario()">
+              <i class="fas fa-plus"></i> Crear usuario
+            </button>
+          </div>
+        </div>
+
+        <div class="search-bar">
+          <i class="fas fa-search search-icon"></i>
+          <input type="text" class="search-input" placeholder="Buscar por nombre, usuario, correo o rol..."
+            [(ngModel)]="filtroUsuario" (input)="filtrarUsuarios()">
+        </div>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Usuario</th>
+                <th>Nombre completo</th>
+                <th>Correo</th>
+                <th>Tipo</th>
+                <th>Rol</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let u of usuariosFiltrados; let i = index" [style.animation-delay]="i * 0.05 + 's'" class="fade-in-row">
+                <td>
+                  <div class="user-cell">
+                    <div class="avatar-circle avatar-sm">{{ getInitials(u) }}</div>
+                    <span class="username-text">{{ u.usuario }}</span>
+                  </div>
+                </td>
+                <td>{{ u.primer_nombre }} {{ u.segundo_nombre || '' }} {{ u.primer_apellido }} {{ u.segundo_apellido || '' }}</td>
+                <td>{{ u.correo || '—' }}</td>
+                <td><span class="badge badge-gray">{{ u.tipo_usuario_nombre || '—' }}</span></td>
+                <td><span class="badge" [ngClass]="getRolBadgeClass(u)">{{ getRolNombre(u) }}</span></td>
+                <td>
+                  <span class="badge" [ngClass]="u.estado ? 'badge-success' : 'badge-inactive'">
+                    {{ u.estado ? 'Activo' : 'Inactivo' }}
+                  </span>
+                </td>
+                <td>
+                  <div class="action-btns">
+                    <button class="action-btn edit" title="Editar" (click)="abrirEditarUsuario(u)">
+                      <i class="fas fa-pen"></i>
+                    </button>
+                    <button class="action-btn delete" title="Eliminar" (click)="eliminarUsuario(u)">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="empty-state" *ngIf="usuariosFiltrados.length === 0">
+            <i class="fas fa-users-slash"></i>
+            <p>No se encontraron usuarios</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== ROLES ========== -->
+      <section *ngIf="seccionActiva === 'roles'" class="section-container fade-in">
+        <div class="section-header">
+          <div>
+            <h1 class="section-title">Gestión de Roles</h1>
+            <p class="section-subtitle">Crea, edita y elimina roles del sistema</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-navy" (click)="abrirCrearRol()">
+              <i class="fas fa-plus"></i> Crear rol
+            </button>
+          </div>
+        </div>
+
+        <div class="search-bar">
+          <i class="fas fa-search search-icon"></i>
+          <input type="text" class="search-input" placeholder="Buscar rol..."
+            [(ngModel)]="filtroRol" (input)="filtrarRoles()">
+        </div>
+
+        <div class="roles-grid">
+          <div *ngFor="let r of rolesFiltrados; let i = index" class="role-card fade-in-row" [style.animation-delay]="i * 0.1 + 's'">
+            <div class="role-card-header">
+              <div class="role-icon" [ngClass]="{
+                'role-admin': r.nombre.includes('Admin'),
+                'role-coordinador': r.nombre.includes('Coordinador'),
+                'role-educacion': r.nombre.includes('Educación') || r.nombre.includes('Educacion'),
+                'role-mujeres': r.nombre.includes('Mujeres')
+              }">
+                <i class="fas" [ngClass]="getRolIcon(r.nombre)"></i>
+              </div>
+              <div class="role-info">
+                <span class="role-name">{{ r.nombre }}</span>
+                <span class="role-users-count"><i class="fas fa-users"></i> {{ r.cantidad_usuarios || 0 }} usuarios</span>
+              </div>
+            </div>
+            <p class="role-desc">{{ r.descripcion || 'Sin descripción' }}</p>
+            <div class="role-actions">
+              <button class="action-btn edit" title="Editar" (click)="abrirEditarRol(r)">
+                <i class="fas fa-pen"></i>
+              </button>
+              <button class="action-btn delete" title="Eliminar" (click)="eliminarRol(r)">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== PERMISOS ========== -->
+      <section *ngIf="seccionActiva === 'permisos'" class="section-container fade-in">
+        <div class="section-header">
+          <div>
+            <h1 class="section-title">Permisos por Rol</h1>
+            <p class="section-subtitle">Selecciona un rol para configurar sus permisos por módulo</p>
+          </div>
+        </div>
+
+        <div class="permisos-layout">
+          <!-- Roles list -->
+          <div class="roles-list-panel">
+            <h3 class="panel-title">Roles</h3>
+            <div *ngFor="let r of roles" class="role-select-item" [class.active]="rolSeleccionado?.id_rol === r.id_rol"
+              (click)="seleccionarRolParaPermisos(r)">
+              <i class="fas" [ngClass]="getRolIcon(r.nombre)"></i>
+              <span>{{ r.nombre }}</span>
+            </div>
+          </div>
+
+          <!-- Permisos grid -->
+          <div class="permisos-panel" *ngIf="rolSeleccionado">
+            <h3 class="panel-title">Permisos de: <span class="text-navy">{{ rolSeleccionado.nombre }}</span></h3>
+            <div *ngFor="let m of modulos" class="modulo-permisos">
+              <div class="modulo-header">
+                <i class="fas" [ngClass]="m.icono || 'fa-cube'"></i>
+                <span>{{ m.nombre }}</span>
+              </div>
+              <div class="permisos-chips">
+                <label *ngFor="let p of permisos" class="permiso-chip"
+                  [class.active]="tienePermiso(m.id_modulo, p.id_permiso)"
+                  (click)="togglePermiso(m.id_modulo, p.id_permiso)">
+                  <i class="fas" [class.fa-check]="tienePermiso(m.id_modulo, p.id_permiso)"
+                    [class.fa-times]="!tienePermiso(m.id_modulo, p.id_permiso)"></i>
+                  {{ p.nombre }}
+                </label>
+              </div>
+            </div>
+            <div class="permisos-footer">
+              <button class="btn btn-navy" (click)="guardarPermisos()">
+                <i class="fas fa-save"></i> Guardar permisos
+              </button>
+            </div>
+          </div>
+          <div class="permisos-panel permisos-empty" *ngIf="!rolSeleccionado">
+            <i class="fas fa-hand-pointer"></i>
+            <p>Selecciona un rol para ver sus permisos</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== GRUPOS ========== -->
+      <section *ngIf="seccionActiva === 'grupos'" class="section-container fade-in">
+        <div class="section-header">
+          <div>
+            <h1 class="section-title">Gestión de Grupos</h1>
+            <p class="section-subtitle">Administra los grupos del sistema y sus participantes</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-navy" (click)="abrirCrearGrupo()">
+              <i class="fas fa-plus"></i> Crear grupo
+            </button>
+          </div>
+        </div>
+
+        <div class="search-bar">
+          <i class="fas fa-search search-icon"></i>
+          <input type="text" class="search-input" placeholder="Buscar grupo por nombre, descripción o programa..."
+            [(ngModel)]="filtroGrupo" (input)="filtrarGrupos()">
+        </div>
+
+        <div class="roles-grid">
+          <div *ngFor="let g of gruposFiltrados; let i = index" class="role-card fade-in-row" [style.animation-delay]="i * 0.1 + 's'">
+            <div class="role-card-header">
+              <div class="role-icon role-admin">
+                <i class="fas fa-layer-group"></i>
+              </div>
+              <div class="role-info">
+                <span class="role-name">{{ g.nombre }}</span>
+                <span class="role-users-count"><i class="fas fa-users"></i> {{ g.cantidad_participantes }} participantes</span>
+              </div>
+            </div>
+            <p class="role-desc">{{ g.descripcion || 'Sin descripción' }}</p>
+            <div style="margin-bottom: 12px;">
+              <span class="badge badge-blue">{{ g.programa_nombre || 'Sin programa' }}</span>
+              <span class="badge" [ngClass]="g.estado ? 'badge-success' : 'badge-inactive'" style="margin-left: 4px;">
+                {{ g.estado ? 'Activo' : 'Inactivo' }}
+              </span>
+            </div>
+            <div *ngIf="g.participantes && g.participantes.length > 0" style="margin-bottom: 12px;">
+              <div *ngFor="let gp of g.participantes | slice:0:3" style="display: flex; align-items: center; justify-content: space-between; padding: 4px 0; font-size: 0.85rem; border-bottom: 1px solid #f0f0f0;">
+                <span><i class="fas fa-user" style="color: #999; margin-right: 6px;"></i>{{ gp.participante_nombre }}</span>
+                <button class="action-btn delete" style="padding: 2px 6px; font-size: 0.7rem;" title="Remover" (click)="removerParticipante(gp)">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+              <div *ngIf="g.participantes.length > 3" style="font-size: 0.8rem; color: #888; margin-top: 4px;">
+                +{{ g.participantes.length - 3 }} más...
+              </div>
+            </div>
+            <div *ngIf="!g.participantes || g.participantes.length === 0" style="margin-bottom: 12px; font-size: 0.85rem; color: #999;">
+              <i class="fas fa-info-circle"></i> Sin participantes asignados
+            </div>
+            <div class="role-actions">
+              <button class="action-btn edit" title="Asignar participante" (click)="abrirAsignarParticipante(g)">
+                <i class="fas fa-user-plus"></i>
+              </button>
+              <button class="action-btn edit" title="Editar" (click)="abrirEditarGrupo(g)">
+                <i class="fas fa-pen"></i>
+              </button>
+              <button class="action-btn delete" title="Eliminar" (click)="eliminarGrupo(g)">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="empty-state" *ngIf="gruposFiltrados.length === 0">
+          <i class="fas fa-layer-group"></i>
+          <p>No se encontraron grupos</p>
+        </div>
+      </section>
+
+      <!-- ========== COPIA DE SEGURIDAD ========== -->
+      <section *ngIf="seccionActiva === 'backup'" class="section-container fade-in">
+        <div class="section-header">
+          <div>
+            <h1 class="section-title">Copia de Seguridad</h1>
+            <p class="section-subtitle">Respalda y restaura los datos del sistema</p>
+          </div>
+        </div>
+
+        <div class="bk-grid">
+          <!-- Respaldo manual -->
+          <div class="bk-card">
+            <div class="bk-card-title"><i class="fas fa-download"></i> Respaldo manual</div>
+            <p class="bk-card-hint">Crea una copia completa de la base de datos en el servidor (archivo .bak).</p>
+            <button class="btn btn-navy" (click)="crearBackup()" [disabled]="creandoBackup">
+              <i class="fas me-1" [ngClass]="creandoBackup ? 'fa-spinner fa-spin' : 'fa-plus-circle'"></i>
+              {{ creandoBackup ? 'Generando respaldo...' : 'Crear copia ahora' }}
+            </button>
+            <p class="bk-meta" *ngIf="backups.length > 0 && backups[0].existe">
+              Última copia: <strong>{{ backups[0].archivo }}</strong><br>
+              {{ backups[0].fecha | date: 'dd/MM/yyyy HH:mm' }} · {{ formatoTamano(backups[0].tamano_bytes) }}
+            </p>
+          </div>
+
+          <!-- Cargar respaldo (recuperación) -->
+          <div class="bk-card">
+            <div class="bk-card-title"><i class="fas fa-upload"></i> Cargar respaldo</div>
+            <p class="bk-card-hint">Sube un archivo <strong>.bak</strong> desde tu equipo para restaurar el sistema si el servidor cae.</p>
+            <label class="btn btn-outline" [class.bk-disabled]="cargandoRespaldo">
+              <i class="fas me-1" [ngClass]="cargandoRespaldo ? 'fa-spinner fa-spin' : 'fa-file-import'"></i>
+              {{ cargandoRespaldo ? 'Subiendo respaldo...' : 'Seleccionar archivo .bak' }}
+              <input type="file" accept=".bak" (change)="cargarRespaldo($event)" [disabled]="cargandoRespaldo">
+            </label>
+          </div>
+
+          <!-- Respaldo automático -->
+          <div class="bk-card">
+            <div class="bk-card-title"><i class="fas fa-clock"></i> Respaldo automático</div>
+            <p class="bk-card-hint">El servidor ejecuta la copia en la fecha y hora programadas, aunque el navegador esté cerrado.</p>
+            <div class="bk-toggle-row">
+              <label class="bk-switch">
+                <input type="checkbox" [(ngModel)]="formBackupConfig.activo">
+                <span class="bk-slider"></span>
+              </label>
+              <span class="bk-toggle-label" [class.on]="formBackupConfig.activo">
+                {{ formBackupConfig.activo ? 'Activado' : 'Desactivado' }}
+              </span>
+            </div>
+            <div class="bk-config-row" *ngIf="formBackupConfig.activo">
+              <div class="bk-field">
+                <label>Frecuencia</label>
+                <select class="form-input" [(ngModel)]="formBackupConfig.intervalo">
+                  <option value="horario">Cada hora</option>
+                  <option value="diario">Diario</option>
+                  <option value="semanal">Semanal</option>
+                  <option value="mensual">Mensual</option>
+                  <option value="anual">Anual</option>
+                </select>
+              </div>
+              <div class="bk-field">
+                <label>Hora</label>
+                <input type="time" class="form-input" [(ngModel)]="formBackupConfig.hora">
+              </div>
+            </div>
+            <p class="bk-meta" *ngIf="formBackupConfig.activo && configBackup?.proxima_ejecucion">
+              <i class="fas fa-bell me-1"></i>Próxima ejecución: {{ configBackup!.proxima_ejecucion | date: 'dd/MM/yyyy HH:mm' }}
+            </p>
+            <p class="bk-meta" *ngIf="configBackup?.ultimo_respaldo">
+              <i class="fas fa-check-circle me-1"></i>Último respaldo automático: {{ configBackup!.ultimo_respaldo | date: 'dd/MM/yyyy HH:mm' }}
+            </p>
+            <button class="btn btn-outline" (click)="guardarConfigBackup()" [disabled]="guardandoConfigBackup">
+              <i class="fas me-1" [ngClass]="guardandoConfigBackup ? 'fa-spinner fa-spin' : 'fa-save'"></i>
+              {{ guardandoConfigBackup ? 'Guardando...' : 'Guardar configuración' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Historial -->
+        <div class="bk-hist-header">
+          <h2 class="bk-hist-title"><i class="fas fa-history"></i> Historial de respaldos</h2>
+          <button class="btn btn-outline btn-sm" (click)="cargarBackups()" [disabled]="cargandoBackups">
+            <i class="fas fa-sync-alt me-1"></i> Actualizar
+          </button>
+        </div>
+
+        <div class="table-container" *ngIf="backups.length > 0">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Archivo</th>
+                <th>Fecha</th>
+                <th>Tamaño</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let b of backups">
+                <td>
+                  <span class="bk-badge"
+                        [ngClass]="b.tipo === 'Automatico' ? 'bk-badge-auto' : (b.tipo === 'Cargado' ? 'bk-badge-cargado' : 'bk-badge-manual')">
+                    {{ b.tipo === 'Automatico' ? 'Automático' : (b.tipo === 'Cargado' ? 'Cargado' : 'Manual') }}
+                  </span>
+                </td>
+                <td>
+                  <i class="fas fa-file-archive me-2 text-muted"></i>{{ b.archivo }}
+                  <span class="bk-badge bk-badge-missing" *ngIf="!b.existe">Archivo eliminado</span>
+                </td>
+                <td>{{ b.fecha | date: 'dd/MM/yyyy HH:mm' }}</td>
+                <td>{{ formatoTamano(b.tamano_bytes) }}</td>
+                <td>
+                  <div class="action-btns" *ngIf="b.existe">
+                    <button class="action-btn download" title="Descargar" (click)="descargarBackup(b)">
+                      <i class="fas fa-download"></i>
+                    </button>
+                    <button class="action-btn restore" title="Restaurar" (click)="restaurarBackup(b)">
+                      <i class="fas fa-history"></i>
+                    </button>
+                    <button class="action-btn delete" title="Eliminar" (click)="eliminarBackup(b)">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                  <span class="text-muted" *ngIf="!b.existe">—</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="empty-state" *ngIf="backups.length === 0 && cargandoBackups">
+          <i class="fas fa-spinner fa-spin"></i>
+          <p>Cargando copias de seguridad...</p>
+        </div>
+        <div class="empty-state" *ngIf="backups.length === 0 && !cargandoBackups">
+          <i class="fas fa-database"></i>
+          <p>No hay copias de seguridad todavía</p>
+        </div>
+
+        <p class="ap-hint">
+          <i class="fas fa-info-circle me-1"></i>
+          Las copias se guardan en la carpeta <strong>Backups</strong> del proyecto. Al restaurar, la base de datos
+          vuelve al estado de la copia seleccionada.
+        </p>
+      </section>
+
+      <!-- ========== APARIENCIA ========== -->
+      <section *ngIf="seccionActiva === 'apariencia'" class="section-container fade-in">
+        <div class="section-header">
+          <div>
+            <h1 class="section-title">Apariencia</h1>
+            <p class="section-subtitle">Personaliza la identidad visual del sistema</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-outline" (click)="cargarApariencia()" [disabled]="guardandoApariencia">
+              <i class="fas fa-undo me-1"></i> Restablecer
+            </button>
+            <button class="btn btn-navy" (click)="guardarApariencia()" [disabled]="guardandoApariencia || cargandoApariencia">
+              <i class="fas me-1" [ngClass]="guardandoApariencia ? 'fa-spinner fa-spin' : 'fa-save'"></i>
+              {{ guardandoApariencia ? 'Guardando...' : 'Guardar cambios' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="ap-grid">
+          <!-- Logotipo -->
+          <div class="ap-card">
+            <div class="ap-card-title"><i class="fas fa-image"></i> Logotipo</div>
+            <p class="ap-card-hint">Se muestra en el menú lateral y en el inicio de sesión.</p>
+            <div class="ap-row">
+              <img class="ap-logo" [src]="formApariencia.logo || 'LOGO_ANADESA.jpg'" alt="Logotipo">
+              <div class="ap-btns">
+                <label class="btn btn-outline btn-sm">
+                  <i class="fas fa-upload me-1"></i> Cambiar
+                  <input type="file" accept="image/*" (change)="seleccionarImagen($event, 'logo')">
+                </label>
+                <button class="btn btn-outline btn-sm" *ngIf="formApariencia.logo" (click)="quitarImagen('logo')">
+                  <i class="fas fa-times me-1"></i> Quitar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Imagen de inicio de sesión -->
+          <div class="ap-card">
+            <div class="ap-card-title"><i class="fas fa-image"></i> Imagen del inicio de sesión</div>
+            <p class="ap-card-hint">Fondo del panel izquierdo de la pantalla de acceso.</p>
+            <div class="ap-row">
+              <img class="ap-login-img" [src]="formApariencia.imagen_login || 'LOGO_ANADESA.jpg'" alt="Imagen de inicio">
+              <div class="ap-btns">
+                <label class="btn btn-outline btn-sm">
+                  <i class="fas fa-upload me-1"></i> Cambiar
+                  <input type="file" accept="image/*" (change)="seleccionarImagen($event, 'imagen_login')">
+                </label>
+                <button class="btn btn-outline btn-sm" *ngIf="formApariencia.imagen_login" (click)="quitarImagen('imagen_login')">
+                  <i class="fas fa-times me-1"></i> Quitar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Colores institucionales -->
+          <div class="ap-card ap-card-wide">
+            <div class="ap-card-title"><i class="fas fa-palette"></i> Colores institucionales</div>
+            <p class="ap-card-hint">Colores base del sistema: el primario para títulos y encabezados, el de acento para el menú lateral y botones.</p>
+
+            <div class="ap-color-row">
+              <span class="ap-color-label">Color primario</span>
+              <input type="color" class="ap-color" [(ngModel)]="formApariencia.color_primario">
+              <input type="text" class="ap-hex" [(ngModel)]="formApariencia.color_primario" maxlength="7" spellcheck="false">
+              <div class="ap-swatches">
+                <button *ngFor="let c of paleta" type="button" class="ap-swatch" [style.background]="c.hex"
+                        [title]="c.nombre + ' ' + c.hex" (click)="formApariencia.color_primario = c.hex">
+                </button>
+              </div>
+            </div>
+
+            <div class="ap-color-row">
+              <span class="ap-color-label">Color de acento</span>
+              <input type="color" class="ap-color" [(ngModel)]="formApariencia.color_acento">
+              <input type="text" class="ap-hex" [(ngModel)]="formApariencia.color_acento" maxlength="7" spellcheck="false">
+              <div class="ap-swatches">
+                <button *ngFor="let c of paleta" type="button" class="ap-swatch" [style.background]="c.hex"
+                        [title]="c.nombre + ' ' + c.hex" (click)="formApariencia.color_acento = c.hex">
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tamaño de fuente -->
+          <div class="ap-card">
+            <div class="ap-card-title"><i class="fas fa-text-height"></i> Tamaño de fuente</div>
+            <p class="ap-card-hint">Escala general del texto en todo el sistema.</p>
+            <select class="form-input" [(ngModel)]="formApariencia.tamano_fuente">
+              <option value="chica">Chica</option>
+              <option value="mediana">Mediana</option>
+              <option value="grande">Grande</option>
+            </select>
+            <div class="ap-font-preview" [style.font-size]="tam[formApariencia.tamano_fuente]">
+              Sistema de Gestión — texto de muestra Aa
+            </div>
+          </div>
+
+          <!-- Nombre mostrado -->
+          <div class="ap-card">
+            <div class="ap-card-title"><i class="fas fa-font"></i> Nombre mostrado en el sistema</div>
+            <p class="ap-card-hint">Aparece en el menú lateral, la barra superior y el inicio de sesión.</p>
+            <input type="text" class="form-input" maxlength="100" [(ngModel)]="formApariencia.nombre_sistema"
+                   placeholder="ANADESA">
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL CREAR/EDITAR USUARIO -->
+  <div class="modal-overlay" *ngIf="mostrarModalUsuario" (click)="cerrarModalUsuario()">
+    <div class="modal-panel modal-lg slide-in" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ editandoUsuario ? 'Editar Usuario' : 'Crear Usuario' }}</h2>
+        <button class="modal-close" (click)="cerrarModalUsuario()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Tipo de usuario *</label>
+            <select [(ngModel)]="formUsuario.id_tipo_usuario" class="form-input">
+              <option *ngFor="let t of tiposUsuario" [ngValue]="t.id">{{ t.nombre }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Usuario *</label>
+            <input type="text" [(ngModel)]="formUsuario.usuario" class="form-input" placeholder="Nombre de usuario">
+          </div>
+          <div class="form-group">
+            <label>Primer nombre *</label>
+            <input type="text" [(ngModel)]="formUsuario.primer_nombre" class="form-input" placeholder="Nombre">
+          </div>
+          <div class="form-group">
+            <label>Segundo nombre</label>
+            <input type="text" [(ngModel)]="formUsuario.segundo_nombre" class="form-input" placeholder="Segundo nombre">
+          </div>
+          <div class="form-group">
+            <label>Primer apellido *</label>
+            <input type="text" [(ngModel)]="formUsuario.primer_apellido" class="form-input" placeholder="Apellido">
+          </div>
+          <div class="form-group">
+            <label>Segundo apellido</label>
+            <input type="text" [(ngModel)]="formUsuario.segundo_apellido" class="form-input" placeholder="Segundo apellido">
+          </div>
+          <div class="form-group">
+            <label>Correo electrónico</label>
+            <input type="email" [(ngModel)]="formUsuario.correo" class="form-input" placeholder="correo@ejemplo.com">
+          </div>
+          <div class="form-group">
+            <label>Teléfono</label>
+            <input type="text" [(ngModel)]="formUsuario.telefono" class="form-input" placeholder="Teléfono">
+          </div>
+          <div class="form-group" *ngIf="!editandoUsuario">
+            <label>Contraseña *</label>
+            <input type="password" [(ngModel)]="formUsuario.contrasena" class="form-input" placeholder="Contraseña">
+          </div>
+          <div class="form-group" *ngIf="editandoUsuario">
+            <label>Nueva contraseña (dejar vacío para no cambiar)</label>
+            <input type="password" [(ngModel)]="formUsuario.contrasena" class="form-input" placeholder="Nueva contraseña">
+          </div>
+          <div class="form-group">
+            <label>Estado</label>
+            <select [(ngModel)]="formUsuario.estado" class="form-input">
+              <option [ngValue]="true">Activo</option>
+              <option [ngValue]="false">Inactivo</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-section" *ngIf="roles.length > 0">
+          <label class="form-section-label">Roles asignados * (obligatorio)</label>
+          <div class="roles-chips">
+            <label *ngFor="let r of roles" class="role-chip"
+              [class.active]="usuarioRoles.includes(r.id_rol)"
+              (click)="toggleRolUsuario(r.id_rol)">
+              <i class="fas" [class.fa-check]="usuarioRoles.includes(r.id_rol)"></i>
+              {{ r.nombre }}
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="cerrarModalUsuario()">Cancelar</button>
+        <button class="btn btn-navy" (click)="guardarUsuario()">
+          <i class="fas fa-check"></i> {{ editandoUsuario ? 'Actualizar' : 'Crear' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CREAR/EDITAR ROL -->
+  <div class="modal-overlay" *ngIf="mostrarModalRol" (click)="cerrarModalRol()">
+    <div class="modal-panel slide-in" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ editandoRol ? 'Editar Rol' : 'Crear Rol' }}</h2>
+        <button class="modal-close" (click)="cerrarModalRol()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group form-group-full">
+            <label>Nombre del rol *</label>
+            <input type="text" [(ngModel)]="formRol.nombre" class="form-input" placeholder="Ej: Administrador">
+          </div>
+          <div class="form-group form-group-full">
+            <label>Descripción</label>
+            <textarea [(ngModel)]="formRol.descripcion" class="form-input form-textarea" placeholder="Descripción del rol..." rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Estado</label>
+            <select [(ngModel)]="formRol.estado" class="form-input">
+              <option [ngValue]="true">Activo</option>
+              <option [ngValue]="false">Inactivo</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="cerrarModalRol()">Cancelar</button>
+        <button class="btn btn-navy" (click)="guardarRol()">
+          <i class="fas fa-check"></i> {{ editandoRol ? 'Actualizar' : 'Crear' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CREAR/EDITAR GRUPO -->
+  <div class="modal-overlay" *ngIf="mostrarModalGrupo" (click)="cerrarModalGrupo()">
+    <div class="modal-panel slide-in" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ editandoGrupo ? 'Editar Grupo' : 'Crear Grupo' }}</h2>
+        <button class="modal-close" (click)="cerrarModalGrupo()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group form-group-full">
+            <label>Nombre del grupo *</label>
+            <input type="text" [(ngModel)]="formGrupo.nombre" class="form-input" placeholder="Ej: Grupo Norte">
+          </div>
+          <div class="form-group form-group-full">
+            <label>Descripción</label>
+            <textarea [(ngModel)]="formGrupo.descripcion" class="form-input form-textarea" placeholder="Descripción del grupo..." rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Programa *</label>
+            <select [(ngModel)]="formGrupo.id_programa" class="form-input">
+              <option [ngValue]="0" disabled>Seleccionar programa</option>
+              <option *ngFor="let p of programas" [ngValue]="p.id">{{ p.nombre }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Estado</label>
+            <select [(ngModel)]="formGrupo.estado" class="form-input">
+              <option [ngValue]="true">Activo</option>
+              <option [ngValue]="false">Inactivo</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="cerrarModalGrupo()">Cancelar</button>
+        <button class="btn btn-navy" (click)="guardarGrupo()">
+          <i class="fas fa-check"></i> {{ editandoGrupo ? 'Actualizar' : 'Crear' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL ASIGNAR PARTICIPANTE -->
+  <div class="modal-overlay" *ngIf="mostrarModalAsignar" (click)="cerrarModalAsignar()">
+    <div class="modal-panel modal-lg slide-in" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Asignar participante a: <span class="text-navy">{{ grupoSeleccionado?.nombre }}</span></h2>
+        <button class="modal-close" (click)="cerrarModalAsignar()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="search-bar" style="margin-bottom: 16px;">
+          <i class="fas fa-search search-icon"></i>
+          <input type="text" class="search-input" placeholder="Buscar participante por nombre..."
+            [(ngModel)]="filtroParticipante" (input)="filtrarParticipantes()">
+        </div>
+        <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Programa</th>
+                <th>Estado</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let p of participantesFiltrados; let i = index">
+                <td>{{ p.primer_nombre }} {{ p.primer_apellido }}</td>
+                <td>{{ p.programa_nombre || '—' }}</td>
+                <td><span class="badge badge-success">Activo</span></td>
+                <td>
+                  <button class="btn btn-sm btn-navy" (click)="asignarParticipante(p.id_participante)">
+                    <i class="fas fa-plus"></i> Asignar
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="empty-state" *ngIf="participantesFiltrados.length === 0">
+            <i class="fas fa-users-slash"></i>
+            <p>No hay participantes disponibles para asignar</p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="cerrarModalAsignar()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DIALOGO CONFIRMACION -->
+  <div class="modal-overlay" *ngIf="mostrarDialogo" (click)="cerrarDialogo()">
+    <div class="dialog scale-in" [ngClass]="{ 'dialog-danger': dialogoTipo === 'danger' }" (click)="$event.stopPropagation()">
+      <div class="dialog-icon">
+        <i class="fas" [ngClass]="dialogoTipo === 'danger' ? 'fa-exclamation-triangle' : 'fa-info-circle'"></i>
+      </div>
+      <h3 class="dialog-title">{{ dialogoTitulo }}</h3>
+      <p class="dialog-message">{{ dialogoMensaje }}</p>
+      <div class="dialog-buttons">
+        <button class="btn-dialog btn-cancel" (click)="cerrarDialogo()">Cancelar</button>
+        <button class="btn-dialog" [ngClass]="dialogoTipo === 'danger' ? 'btn-delete' : 'btn-info'" (click)="ejecutarAccion()">
+          Confirmar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOASTS -->
+  <div class="toast-container">
+    <div *ngFor="let t of toasts" class="toast slide-in" [ngClass]="'toast-' + t.type">
+      <i class="fas" [ngClass]="{
+        'fa-check-circle': t.type === 'success',
+        'fa-exclamation-circle': t.type === 'error',
+        'fa-info-circle': t.type === 'info'
+      }"></i>
+      <span>{{ t.message }}</span>
+    </div>
+  </div>
+</app-layout>

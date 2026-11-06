@@ -1,0 +1,82 @@
+<aside class="panel-historial" [class.colapsado]="!expandido">
+  <div class="panel-header">
+    <button class="panel-toggle" (click)="alternar()"
+            [attr.title]="expandido ? 'Ocultar historial' : 'Mostrar historial y pendientes'"
+            [attr.aria-label]="expandido ? 'Ocultar historial' : 'Mostrar historial'">
+      <i class="fas" [ngClass]="expandido ? 'fa-chevron-left' : 'fa-clock'"></i>
+      <span class="badge-pend" *ngIf="!expandido && pendientes.length">{{ pendientes.length }}</span>
+    </button>
+    <div class="panel-titulo" *ngIf="expandido">
+      <i class="fas fa-history"></i> Historial y pendientes
+      <button class="btn-refrescar" (click)="cargar()" title="Actualizar" [disabled]="cargando">
+        <i class="fas fa-sync-alt" [class.spinning]="cargando"></i>
+      </button>
+    </div>
+    <span class="titulo-mini" *ngIf="!expandido">Historial y pendientes</span>
+  </div>
+
+  <div class="panel-cuerpo" *ngIf="expandido">
+    <!-- PENDIENTES -->
+    <section class="panel-seccion">
+      <h6 class="seccion-titulo">
+        <i class="fas fa-exclamation-circle"></i> Pendientes
+        <span class="contador" *ngIf="pendientes.length">{{ pendientes.length }}</span>
+      </h6>
+
+      <div class="pendiente" *ngFor="let p of pendientes" [ngClass]="'sev-' + p.severidad">
+        <div class="pendiente-head">
+          <span class="pendiente-titulo">{{ p.titulo }}</span>
+          <span class="pendiente-cant">{{ p.cantidad }}</span>
+        </div>
+        <span class="pendiente-detalle">{{ p.detalle }}</span>
+      </div>
+
+      <div class="estado-vacio" *ngIf="!cargando && pendientes.length === 0">
+        <i class="fas fa-check-circle"></i> Todo al día, sin pendientes.
+      </div>
+    </section>
+
+    <!-- ACTIVIDAD RECIENTE -->
+    <section class="panel-seccion">
+      <h6 class="seccion-titulo"><i class="fas fa-stream"></i> Actividad reciente</h6>
+
+      <div class="timeline">
+        <div class="evento" *ngFor="let e of actividad">
+          <div class="evento-punto">
+            <i class="fas" [ngClass]="iconoDe(e.tipo)"></i>
+          </div>
+          <div class="evento-cuerpo">
+            <span class="evento-titulo">{{ e.titulo }}</span>
+            <span class="evento-detalle" *ngIf="e.detalle">{{ e.detalle }}</span>
+            <!-- Información adicional para actividades -->
+            <div class="evento-meta" *ngIf="e.tipo === 'actividad'">
+              <span class="evento-estado" *ngIf="e.estado" [ngClass]="estadoBadge(e.estado)">
+                {{ estadoLabel(e.estado) }}
+              </span>
+              <span class="evento-responsable" *ngIf="e.responsable">
+                <i class="fas fa-user"></i> {{ e.responsable }}
+              </span>
+              <span class="evento-fecha-prog" *ngIf="e.fecha_programada">
+                <i class="fas fa-calendar-day"></i> {{ e.fecha_programada | date:'dd/MM/yyyy' }}
+              </span>
+            </div>
+            <div class="evento-acciones" *ngIf="e.tipo === 'actividad' && e.id_actividad && e.id_programacion">
+              <button class="btn-ver" (click)="irActividad(e.id_actividad, e.id_programacion)" title="Ver actividad">
+                <i class="fas fa-eye"></i> Ver
+              </button>
+            </div>
+            <span class="evento-fecha">{{ tiempoRelativo(e.fecha) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="estado-vacio" *ngIf="!cargando && actividad.length === 0">
+        <i class="fas fa-inbox"></i> Aún no hay actividad registrada.
+      </div>
+
+      <div class="cargando" *ngIf="cargando">
+        <i class="fas fa-circle-notch fa-spin"></i> Cargando...
+      </div>
+    </section>
+  </div>
+</aside>

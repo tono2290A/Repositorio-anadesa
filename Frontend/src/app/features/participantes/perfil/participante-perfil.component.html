@@ -1,0 +1,534 @@
+<app-layout>
+  <!-- Loading -->
+  <div class="loading-screen" *ngIf="loading">
+    <div class="spinner"></div>
+    <p>Cargando expediente...</p>
+  </div>
+
+  <!-- Error -->
+  <div class="error-screen" *ngIf="error && !loading">
+    <i class="fas fa-exclamation-triangle"></i>
+    <p>{{ error }}</p>
+    <button class="btn btn-outline" (click)="volver()"><i class="fas fa-arrow-left"></i> Volver</button>
+  </div>
+
+  <!-- Perfil -->
+  <div class="perfil-container" *ngIf="participante && !loading">
+    <!-- Top bar -->
+    <div class="perfil-topbar">
+      <button class="btn btn-outline" (click)="volver()"><i class="fas fa-arrow-left"></i> Volver a participantes</button>
+      <div class="dropdown" *ngIf="puedeGenerarReportes">
+        <button class="btn btn-navy dropdown-toggle" data-bs-toggle="dropdown"><i class="fas fa-file-pdf"></i> Descargar Reporte</button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" (click)="descargarReporte(false)"><i class="fas fa-file-alt me-2"></i>Reporte actual</a></li>
+          <li><a class="dropdown-item" (click)="descargarReporte(true)"><i class="fas fa-file-medical me-2"></i>Reporte completo</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item" (click)="abrirPickerReporte()"><i class="fas fa-tasks me-2"></i>Personalizado (elegir secciones)</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Hero card -->
+    <div class="hero-card">
+      <div class="hero-avatar">
+        <img *ngIf="participante.fotografia_ruta" [src]="participanteService.getFotoUrl(participante.fotografia_ruta)" class="avatar-big avatar-photo" (error)="participante.fotografia_ruta = ''">
+        <div *ngIf="!participante.fotografia_ruta" class="avatar-big" [style.background]="participante.sexo === 'Femenino' ? '#9333EA' : '#1E3278'">
+          {{ getInitials() }}
+        </div>
+        <div class="avatar-camera" (click)="profilePhotoInput.click()"><i class="fas fa-camera"></i></div>
+        <input #profilePhotoInput type="file" accept="image/*" (change)="onPhotoSelected($event)" style="display:none;">
+      </div>
+      <div class="hero-info">
+        <h2 class="hero-name">{{ participante.primer_nombre }} {{ participante.segundo_nombre || '' }} {{ participante.primer_apellido }} {{ participante.segundo_apellido || '' }}</h2>
+        <div class="hero-badges">
+          <span class="badge badge-success" *ngIf="participante.estado">Activo</span>
+          <span class="badge badge-inactive" *ngIf="!participante.estado">Inactivo</span>
+          <span class="badge" [ngClass]="getProgramaBadge()">{{ participante.programa_nombre }}</span>
+          <span class="badge badge-blue">{{ participante.categoria_nombre }}</span>
+          <span class="badge badge-green" *ngIf="participante.beca">Beca — Q{{ participante.monto_beca | number:'1.2-2' }}</span>
+          <span class="badge badge-yellow" *ngIf="calcEdad(participante.fecha_nacimiento) !== null && calcEdad(participante.fecha_nacimiento)! < 18">Menor de edad</span>
+        </div>
+        <div class="hero-meta">
+          <span *ngIf="calcEdad(participante.fecha_nacimiento)">{{ calcEdad(participante.fecha_nacimiento) }} años</span>
+          <span *ngIf="participante.comunidad_nombre">{{ participante.comunidad_nombre }}</span>
+          <span *ngIf="participante.correo">{{ participante.correo }}</span>
+          <span *ngIf="participante.telefono">{{ participante.telefono }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="perfil-tabs">
+      <button *ngFor="let t of visibleTabs" class="perfil-tab" [class.active]="activeTab === t.key" (click)="setTab(t.key)">
+        <i class="fas" [ngClass]="t.icon"></i> {{ t.label }}
+        <span class="tab-badge" *ngIf="t.key === 'monitoreo' && monitoreos.length > 0">{{ monitoreos.length }}</span>
+        <span class="tab-badge" *ngIf="t.key === 'evaluaciones' && evaluaciones.length > 0">{{ evaluaciones.length }}</span>
+        <span class="tab-badge" *ngIf="t.key === 'actividades' && asistencia.length > 0">{{ asistencia.length }}</span>
+        <span class="tab-badge" *ngIf="t.key === 'academico' && inscripciones.length > 0">{{ inscripciones.length }}</span>
+      </button>
+    </div>
+
+    <!-- Tab content -->
+    <div class="tab-content">
+
+      <!-- Toast -->
+      <div *ngIf="mensaje" style="background:#EFF6FF;border:1px solid #BFDBFE;color:#1E40AF;border-radius:10px;padding:10px 16px;margin-bottom:14px;font-size:13px;display:flex;justify-content:space-between;align-items:center;">
+        <span>{{ mensaje }}</span>
+        <button class="btn-close-toast" (click)="mensaje = ''" style="background:none;border:none;color:#1E40AF;cursor:pointer;">✕</button>
+      </div>
+
+      <!-- Datos personales -->
+      <div class="tab-panel" *ngIf="activeTab === 'personal'">
+        <div class="info-grid">
+          <div class="info-card">
+            <h3 class="card-title"><i class="fas fa-user"></i> Información personal</h3>
+            <div class="info-row"><span class="info-label">Nombre completo</span><span class="info-value">{{ participante.primer_nombre }} {{ participante.segundo_nombre || '' }} {{ participante.tercer_nombre || '' }} {{ participante.primer_apellido }} {{ participante.segundo_apellido || '' }} {{ participante.tercer_apellido || '' }}</span></div>
+            <div class="info-row" *ngIf="participante.fecha_nacimiento"><span class="info-label">Fecha de nacimiento</span><span class="info-value">{{ participante.fecha_nacimiento | date:'yyyy-MM-dd' }}</span></div>
+            <div class="info-row" *ngIf="calcEdad(participante.fecha_nacimiento) !== null"><span class="info-label">Edad</span><span class="info-value">{{ calcEdad(participante.fecha_nacimiento) }} años</span></div>
+            <div class="info-row" *ngIf="participante.sexo"><span class="info-label">Género</span><span class="info-value">{{ participante.sexo }}</span></div>
+            <div class="info-row" *ngIf="participante.dpi"><span class="info-label">DPI</span><span class="info-value">{{ participante.dpi }}</span></div>
+            <div class="info-row"><span class="info-label">Estado</span><span class="info-value"><span class="badge" [ngClass]="participante.estado ? 'badge-success' : 'badge-inactive'">{{ participante.estado ? 'Activo' : 'Inactivo' }}</span></span></div>
+            <div class="info-row" *ngIf="participante.beca"><span class="info-label">Beca</span><span class="info-value"><span class="badge badge-green">Sí — Q{{ participante.monto_beca | number:'1.2-2' }}</span></span></div>
+            <div class="info-row" *ngIf="!participante.beca"><span class="info-label">Beca</span><span class="info-value"><span class="badge badge-inactive">No</span></span></div>
+          </div>
+          <div class="info-card">
+            <h3 class="card-title"><i class="fas fa-phone"></i> Contacto y ubicación</h3>
+            <div class="info-row" *ngIf="participante.telefono"><span class="info-label">Teléfono</span><span class="info-value">{{ participante.telefono }}</span></div>
+            <div class="info-row" *ngIf="participante.correo"><span class="info-label">Correo</span><span class="info-value">{{ participante.correo }}</span></div>
+            <div class="info-row" *ngIf="participante.direccion?.direccion"><span class="info-label">Dirección</span><span class="info-value">{{ participante.direccion?.direccion }}</span></div>
+            <div class="info-row" *ngIf="participante.comunidad_nombre"><span class="info-label">Comunidad</span><span class="info-value">{{ participante.comunidad_nombre }}</span></div>
+            <div class="info-row" *ngIf="participante.contacto?.contacto_emergencia"><span class="info-label">Contacto emergencia</span><span class="info-value">{{ participante.contacto?.contacto_emergencia }}</span></div>
+            <div class="info-row" *ngIf="participante.contacto?.telefono_emergencia"><span class="info-label">Tel. emergencia</span><span class="info-value">{{ participante.contacto?.telefono_emergencia }}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tutor -->
+      <div class="tab-panel" *ngIf="activeTab === 'tutor'">
+        <div class="info-card" *ngIf="participante.familiares && participante.familiares.length > 0 && participante.familiares[0].primer_nombre">
+          <h3 class="card-title"><i class="fas fa-user-tie"></i> Datos del encargado</h3>
+          <div class="info-row" *ngFor="let f of participante.familiares">
+            <span class="info-label">Nombre</span>
+            <span class="info-value">{{ f.primer_nombre }} {{ f.segundo_nombre || '' }} {{ f.primer_apellido }} {{ f.segundo_apellido || '' }}</span>
+          </div>
+          <div class="info-row" *ngIf="participante.familiares[0].parentesco"><span class="info-label">Parentesco</span><span class="info-value">{{ participante.familiares[0].parentesco }}</span></div>
+          <div class="info-row" *ngIf="participante.familiares[0].dpi"><span class="info-label">DPI</span><span class="info-value">{{ participante.familiares[0].dpi }}</span></div>
+          <div class="info-row" *ngIf="participante.familiares[0].telefono"><span class="info-label">Teléfono</span><span class="info-value">{{ participante.familiares[0].telefono }}</span></div>
+          <div class="info-row" *ngIf="participante.familiares[0].correo"><span class="info-label">Correo</span><span class="info-value">{{ participante.familiares[0].correo }}</span></div>
+        </div>
+        <div class="empty-tab" *ngIf="!participante.familiares || participante.familiares.length === 0 || !participante.familiares[0].primer_nombre">
+          <i class="fas fa-user-slash"></i>
+          <p>Sin datos de encargado registrados.</p>
+        </div>
+      </div>
+
+      <!-- Programa -->
+      <div class="tab-panel" *ngIf="activeTab === 'programa'">
+        <div class="info-card">
+          <h3 class="card-title"><i class="fas fa-folder"></i> Programa y categoría</h3>
+          <div class="info-row" *ngIf="participante.programa_nombre"><span class="info-label">Programa</span><span class="info-value"><span class="badge" [ngClass]="getProgramaBadge()">{{ participante.programa_nombre }}</span></span></div>
+          <div class="info-row" *ngIf="participante.categoria_nombre"><span class="info-label">Categoría</span><span class="info-value"><span class="badge badge-blue">{{ participante.categoria_nombre }}</span></span></div>
+        </div>
+        <div class="info-card" *ngIf="participante.beca" style="margin-top: 16px;">
+          <h3 class="card-title"><i class="fas fa-hand-holding-usd"></i> Beca</h3>
+          <div class="info-row"><span class="info-label">Tiene beca</span><span class="info-value"><span class="badge badge-green">Sí</span></span></div>
+          <div class="info-row" *ngIf="participante.monto_beca"><span class="info-label">Monto</span><span class="info-value fw-bold" style="color: #15803D;">Q{{ participante.monto_beca | number:'1.2-2' }}</span></div>
+        </div>
+      </div>
+
+      <!-- Actividades -->
+      <div class="tab-panel" *ngIf="activeTab === 'actividades'">
+        <div class="info-card" *ngIf="puedeAsignarActividad && catalogoActividades.length > 0" style="margin-bottom:16px;">
+          <h3 class="card-title"><i class="fas fa-plus-circle"></i> Asignar a una actividad programada</h3>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+            <label style="flex:1;min-width:240px;font-size:12px;color:#64748B;">
+              Actividad
+              <select class="form-input" [(ngModel)]="formMonitoreo.id_asignar" style="margin-top:4px;">
+                <option value="">— Elegir actividad —</option>
+                <option *ngFor="let a of catalogoActividades" [value]="a.id_programacion">
+                  {{ a.fecha ? (a.fecha | date:'dd/MM/yyyy') : '' }} — {{ a.nombre }} ({{ a.programa }})
+                </option>
+              </select>
+            </label>
+            <button class="btn btn-navy" (click)="asignarSeleccionada()" [disabled]="!formMonitoreo.id_asignar">
+              <i class="fas fa-user-plus"></i> Asignar
+            </button>
+          </div>
+        </div>
+        <div class="info-card" *ngIf="asistencia.length > 0">
+          <h3 class="card-title"><i class="fas fa-calendar-check"></i> Actividades en las que participó ({{ asistencia.length }})</h3>
+          <div class="academic-table">
+            <table class="data-table-sm">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Actividad</th>
+                  <th>Tipo</th>
+                  <th>Asistencia</th>
+                  <th>Observaciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let a of asistencia; trackBy: trackById">
+                  <td>{{ a.fecha | date:'dd/MM/yyyy' }}</td>
+                  <td class="fw-bold">{{ a.actividad }}</td>
+                  <td><span class="badge badge-blue">{{ a.tipo_actividad || '-' }}</span></td>
+                  <td><span class="badge" [ngClass]="a.presente ? 'badge-success' : 'badge-inactive'">{{ a.presente ? 'Presente' : 'Ausente' }}</span></td>
+                  <td>{{ a.observaciones || '-' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="empty-tab" *ngIf="asistencia.length === 0"><i class="fas fa-calendar-check"></i><p>Sin actividades registradas</p></div>
+      </div>
+
+      <!-- Monitoreo -->
+      <div class="tab-panel" *ngIf="activeTab === 'monitoreo'">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:12px;" *ngIf="puedeMonitorear">
+          <button class="btn btn-navy" (click)="abrirFormMonitoreo()"><i class="fas fa-plus"></i> Nuevo monitoreo</button>
+        </div>
+
+        <!-- Formulario monitoreo -->
+        <div class="info-card" *ngIf="mostrarFormMonitoreo" style="border:2px solid #4A90D9;margin-bottom:16px;">
+          <h3 class="card-title"><i class="fas fa-chart-line"></i> {{ formMonitoreo.id_monitoreo ? 'Editar monitoreo' : 'Registrar monitoreo' }}</h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+            <label style="font-size:12px;color:#64748B;">Fecha *
+              <input type="date" class="form-input" [(ngModel)]="formMonitoreo.fecha" style="margin-top:4px;">
+            </label>
+            <label style="font-size:12px;color:#64748B;">Actividad (opcional)
+              <select class="form-input" [(ngModel)]="formMonitoreo.id_programacion" style="margin-top:4px;">
+                <option [ngValue]="null">— Ninguna —</option>
+                <option *ngFor="let a of catalogoActividades" [ngValue]="a.id_programacion">
+                  {{ a.fecha ? (a.fecha | date:'dd/MM/yyyy') : '' }} — {{ a.nombre }}
+                </option>
+              </select>
+            </label>
+            <label style="font-size:12px;color:#64748B;">Tipo
+              <select class="form-input" [(ngModel)]="formMonitoreo.tipo_monitoreo" style="margin-top:4px;">
+                <option>Individual</option>
+                <option>Grupo</option>
+                <option>Actividad</option>
+                <option>Area/Categoria</option>
+              </select>
+            </label>
+            <label style="font-size:12px;color:#64748B;">Participación
+              <select class="form-input" [(ngModel)]="formMonitoreo.participacion" style="margin-top:4px;">
+                <option>Alta</option>
+                <option>Media</option>
+                <option>Baja</option>
+              </select>
+            </label>
+            <label style="font-size:12px;color:#64748B;grid-column:1/-1;">Observaciones
+              <textarea class="form-input" rows="2" [(ngModel)]="formMonitoreo.observaciones" style="margin-top:4px;"></textarea>
+            </label>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end;">
+            <button class="btn btn-outline" (click)="mostrarFormMonitoreo = false">Cancelar</button>
+            <button class="btn btn-navy" (click)="guardarMonitoreo()" [disabled]="guardandoMonitoreo || !formMonitoreo.fecha">
+              <i class="fas fa-save"></i> {{ guardandoMonitoreo ? 'Guardando…' : 'Guardar' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="info-card" *ngIf="monitoreos.length > 0">
+          <h3 class="card-title"><i class="fas fa-chart-line"></i> Monitoreos realizados ({{ monitoreos.length }})</h3>
+          <div class="academic-table">
+            <table class="data-table-sm">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Actividad</th>
+                  <th>Grupo</th>
+                  <th>Tipo</th>
+                  <th>Participación</th>
+                  <th>Observaciones</th>
+                  <th>Registrado por</th>
+                  <th *ngIf="puedeMonitorear">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let m of monitoreos; trackBy: trackById">
+                  <td>{{ m.fecha | date:'dd/MM/yyyy' }}</td>
+                  <td class="fw-bold">{{ m.actividad || '—' }}</td>
+                  <td>{{ m.grupo || '—' }}</td>
+                  <td><span class="badge" [ngClass]="m.tipo_monitoreo === 'Individual' ? 'badge-purple' : 'badge-blue'">{{ m.tipo_monitoreo || '—' }}</span></td>
+                  <td>
+                    <span *ngIf="m.participacion === 'Alta'" class="badge badge-success">{{ m.participacion }}</span>
+                    <span *ngIf="m.participacion === 'Media'" class="badge badge-blue">{{ m.participacion }}</span>
+                    <span *ngIf="m.participacion === 'Baja'" class="badge badge-inactive">{{ m.participacion }}</span>
+                    <span *ngIf="m.participacion !== 'Alta' && m.participacion !== 'Media' && m.participacion !== 'Baja'">{{ m.participacion || '—' }}</span>
+                  </td>
+                  <td>{{ m.observaciones || '—' }}</td>
+                  <td>{{ m.registrado_por || '—' }}</td>
+                  <td *ngIf="puedeMonitorear" style="white-space:nowrap;">
+                    <button class="btn-icon" title="Editar" (click)="abrirFormMonitoreo(m)"><i class="fas fa-pen"></i></button>
+                    <button class="btn-icon btn-icon-danger" title="Eliminar" (click)="eliminarMonitoreo(m)"><i class="fas fa-trash"></i></button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="empty-tab" *ngIf="monitoreos.length === 0 && !mostrarFormMonitoreo"><i class="fas fa-chart-line"></i><p>Sin registros de monitoreo</p></div>
+      </div>
+
+      <!-- Evaluaciones -->
+      <div class="tab-panel" *ngIf="activeTab === 'evaluaciones'">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:12px;" *ngIf="puedeEvaluar">
+          <button class="btn btn-navy" (click)="abrirFormEvaluacion()"><i class="fas fa-plus"></i> Nueva evaluación</button>
+        </div>
+
+        <!-- Formulario evaluación -->
+        <div class="info-card" *ngIf="mostrarFormEvaluacion" style="border:2px solid #4A90D9;margin-bottom:16px;">
+          <h3 class="card-title"><i class="fas fa-star"></i> {{ formEvaluacion.id_evaluacion ? 'Editar evaluación' : 'Registrar evaluación' }}</h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+            <label style="font-size:12px;color:#64748B;">Fecha *
+              <input type="date" class="form-input" [(ngModel)]="formEvaluacion.fecha" style="margin-top:4px;">
+            </label>
+            <label style="font-size:12px;color:#64748B;">Tipo
+              <select class="form-input" [(ngModel)]="formEvaluacion.tipo_evaluacion" style="margin-top:4px;">
+                <option>Individual</option>
+                <option>Grupo</option>
+                <option>Actividad</option>
+              </select>
+            </label>
+            <label style="font-size:12px;color:#64748B;">Actividad (opcional)
+              <select class="form-input" [(ngModel)]="formEvaluacion.id_programacion" style="margin-top:4px;">
+                <option [ngValue]="null">— Ninguna —</option>
+                <option *ngFor="let a of catalogoActividades" [ngValue]="a.id_programacion">
+                  {{ a.fecha ? (a.fecha | date:'dd/MM/yyyy') : '' }} — {{ a.nombre }}
+                </option>
+              </select>
+            </label>
+            <label style="font-size:12px;color:#64748B;">Nivel (1–5)
+              <input type="number" min="1" max="5" class="form-input" [(ngModel)]="formEvaluacion.nivel" style="margin-top:4px;" placeholder="Ej. 4">
+            </label>
+            <label style="font-size:12px;color:#64748B;">Resultado / observación corta
+              <input type="text" class="form-input" [(ngModel)]="formEvaluacion.resultado" style="margin-top:4px;" placeholder="Ej. Bueno">
+            </label>
+            <label style="font-size:12px;color:#64748B;grid-column:1/-1;">Observaciones
+              <textarea class="form-input" rows="2" [(ngModel)]="formEvaluacion.observaciones" style="margin-top:4px;"></textarea>
+            </label>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end;">
+            <button class="btn btn-outline" (click)="mostrarFormEvaluacion = false">Cancelar</button>
+            <button class="btn btn-navy" (click)="guardarEvaluacion()" [disabled]="guardandoEvaluacion || !formEvaluacion.fecha">
+              <i class="fas fa-save"></i> {{ guardandoEvaluacion ? 'Guardando…' : 'Guardar' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="info-card" *ngIf="evaluaciones.length > 0">
+          <h3 class="card-title"><i class="fas fa-star"></i> Evaluaciones ({{ evaluaciones.length }})</h3>
+          <div class="academic-table">
+            <table class="data-table-sm">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Origen</th>
+                  <th>Tipo</th>
+                  <th>Actividad</th>
+                  <th>Grupo</th>
+                  <th>Resultado</th>
+                  <th>Nivel</th>
+                  <th>Evaluado por</th>
+                  <th>Observaciones</th>
+                  <th *ngIf="puedeEvaluar">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let e of evaluaciones; trackBy: trackById">
+                  <td>{{ e.fecha | date:'dd/MM/yyyy' }}</td>
+                  <td>
+                    <span class="badge"
+                      [ngClass]="e.origen === 'Grupo' ? 'badge-purple' : e.origen === 'Actividad' ? 'badge-blue' : 'badge-success'">
+                      {{ e.origen || 'Individual' }}
+                    </span>
+                  </td>
+                  <td><span class="badge badge-purple">{{ e.tipo_evaluacion || '—' }}</span></td>
+                  <td>{{ e.actividad || '—' }}</td>
+                  <td>{{ e.grupo || '—' }}</td>
+                  <td class="fw-bold">{{ e.resultado_general || (e.promedio != null ? (e.promedio | number:'1.1-1') : '—') }}</td>
+                  <td>
+                    <span *ngIf="e.nivel_texto" class="badge"
+                      [ngClass]="e.nivel_texto === 'Excelente' || e.nivel_texto === 'Bueno' ? 'badge-success' : e.nivel_texto === 'Insuficiente' ? 'badge-inactive' : 'badge-blue'">
+                      {{ e.nivel_texto }}
+                    </span>
+                    <span *ngIf="!e.nivel_texto">—</span>
+                  </td>
+                  <td>{{ e.evaluado_por || '—' }}</td>
+                  <td>{{ e.observaciones || '—' }}</td>
+                  <td *ngIf="puedeEvaluar" style="white-space:nowrap;">
+                    <button class="btn-icon" title="Editar" (click)="abrirFormEvaluacion(e)"><i class="fas fa-pen"></i></button>
+                    <button class="btn-icon btn-icon-danger" title="Eliminar" (click)="eliminarEvaluacion(e)"><i class="fas fa-trash"></i></button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="empty-tab" *ngIf="evaluaciones.length === 0 && !mostrarFormEvaluacion"><i class="fas fa-star"></i><p>Sin evaluaciones registradas</p></div>
+      </div>
+
+      <!-- Académico -->
+      <div class="tab-panel" *ngIf="activeTab === 'academico'">
+        <div class="info-card" *ngIf="inscripciones.length > 0">
+          <h3 class="card-title"><i class="fas fa-school"></i> Inscripciones Académicas</h3>
+          <div class="academic-table">
+            <table class="data-table-sm">
+              <thead>
+                <tr>
+                  <th>Grado</th>
+                  <th>Ciclo</th>
+                  <th>Bloque I</th>
+                  <th>Bloque II</th>
+                  <th>Bloque III</th>
+                  <th>Bloque IV</th>
+                  <th>Promedio</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let i of inscripciones">
+                  <td>{{ i.grado_nombre }}</td>
+                  <td>{{ i.ciclo_anio }}</td>
+                  <td>
+                    <span *ngIf="getBloqueValor(getPromedios(i), 1) !== null"
+                      [style.color]="getBloqueValor(getPromedios(i), 1)! >= 60 ? '#15803D' : '#DC2626'"
+                      style="font-weight:600">
+                      {{ getBloqueValor(getPromedios(i), 1) | number:'1.1-1' }}
+                    </span>
+                    <span *ngIf="getBloqueValor(getPromedios(i), 1) === null" style="color:#CBD5E1">—</span>
+                  </td>
+                  <td>
+                    <span *ngIf="getBloqueValor(getPromedios(i), 2) !== null"
+                      [style.color]="getBloqueValor(getPromedios(i), 2)! >= 60 ? '#15803D' : '#DC2626'"
+                      style="font-weight:600">
+                      {{ getBloqueValor(getPromedios(i), 2) | number:'1.1-1' }}
+                    </span>
+                    <span *ngIf="getBloqueValor(getPromedios(i), 2) === null" style="color:#CBD5E1">—</span>
+                  </td>
+                  <td>
+                    <span *ngIf="getBloqueValor(getPromedios(i), 3) !== null"
+                      [style.color]="getBloqueValor(getPromedios(i), 3)! >= 60 ? '#15803D' : '#DC2626'"
+                      style="font-weight:600">
+                      {{ getBloqueValor(getPromedios(i), 3) | number:'1.1-1' }}
+                    </span>
+                    <span *ngIf="getBloqueValor(getPromedios(i), 3) === null" style="color:#CBD5E1">—</span>
+                  </td>
+                  <td>
+                    <span *ngIf="getBloqueValor(getPromedios(i), 4) !== null"
+                      [style.color]="getBloqueValor(getPromedios(i), 4)! >= 60 ? '#15803D' : '#DC2626'"
+                      style="font-weight:600">
+                      {{ getBloqueValor(getPromedios(i), 4) | number:'1.1-1' }}
+                    </span>
+                    <span *ngIf="getBloqueValor(getPromedios(i), 4) === null" style="color:#CBD5E1">—</span>
+                  </td>
+                  <td>
+                    <span *ngIf="calcPromedio(getPromedios(i)) !== null"
+                      style="font-weight:700; font-size:14px"
+                      [style.color]="calcPromedio(getPromedios(i))! >= 60 ? '#15803D' : '#DC2626'">
+                      {{ calcPromedio(getPromedios(i)) | number:'1.1-1' }}
+                    </span>
+                    <span *ngIf="calcPromedio(getPromedios(i)) === null" style="color:#CBD5E1">—</span>
+                  </td>
+                  <td>
+                    <span *ngIf="calcPromedio(getPromedios(i)) !== null"
+                      class="badge"
+                      [ngClass]="calcPromedio(getPromedios(i))! >= 60 ? 'badge-success' : 'badge-inactive'">
+                      {{ calcPromedio(getPromedios(i))! >= 60 ? 'Aprobado' : 'Reprobado' }}
+                    </span>
+                    <span *ngIf="calcPromedio(getPromedios(i)) === null" style="color:#CBD5E1">—</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="empty-tab" *ngIf="inscripciones.length === 0">
+          <i class="fas fa-graduation-cap"></i>
+          <p>Sin inscripciones académicas registradas</p>
+        </div>
+      </div>
+
+      <!-- Historial -->
+      <div class="tab-panel" *ngIf="activeTab === 'historial'">
+        <div class="info-card" *ngIf="historial.length > 0">
+          <h3 class="card-title"><i class="fas fa-history"></i> Historial Académico</h3>
+          <div class="academic-table">
+            <table class="data-table-sm">
+              <thead>
+                <tr>
+                  <th>Grado</th>
+                  <th>Ciclo</th>
+                  <th>Promedio</th>
+                  <th>Resultado</th>
+                  <th>Registro</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let h of historial">
+                  <td>{{ h.grado_nombre }}</td>
+                  <td>{{ h.ciclo_anio }}</td>
+                  <td><span class="fw-bold" [style.color]="h.promedio_final && h.promedio_final >= 60 ? '#15803D' : '#DC2626'">{{ h.promedio_final ? (h.promedio_final | number:'1.1-1') : '-' }}</span></td>
+                  <td><span class="badge" [ngClass]="h.resultado === 'Aprobado' ? 'badge-success' : h.resultado === 'Reprobado' ? 'badge-inactive' : 'badge-blue'">{{ h.resultado || '-' }}</span></td>
+                  <td>{{ h.fecha_registro | date:'dd/MM/yyyy' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="info-card" *ngIf="participante?.fecha_registro" style="margin-top: 16px;">
+          <h3 class="card-title"><i class="fas fa-clock"></i> Información de Registro</h3>
+          <div class="info-row"><span class="info-label">Fecha de registro</span><span class="info-value">{{ participante?.fecha_registro | date:'yyyy-MM-dd' }}</span></div>
+        </div>
+        <div class="empty-tab" *ngIf="historial.length === 0 && !participante?.fecha_registro">
+          <i class="fas fa-clock"></i>
+          <p>Sin registros en el historial</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+    <!-- Picker de secciones del reporte -->
+    <div *ngIf="mostrarPickerReporte" style="position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1050;display:flex;align-items:center;justify-content:center;padding:20px;" (click)="mostrarPickerReporte = false">
+      <div style="background:#fff;border-radius:16px;padding:24px 28px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);" (click)="$event.stopPropagation()">
+        <h3 style="color:#1E3278;font-size:17px;margin:0 0 6px;"><i class="fas fa-tasks"></i> Secciones del reporte</h3>
+        <p style="color:#64748B;font-size:12px;margin:0 0 16px;">Elige qué debe aparecer en el reporte del participante:</p>
+        <label style="display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13px;color:#1E3278;cursor:pointer;">
+          <input type="checkbox" [(ngModel)]="seccionesReporte.beca"> 🎓 Beca (monto)
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13px;color:#1E3278;cursor:pointer;">
+          <input type="checkbox" [(ngModel)]="seccionesReporte.academico"> 🎓 Registro académico (todos los bloques)
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13px;color:#1E3278;cursor:pointer;">
+          <input type="checkbox" [(ngModel)]="seccionesReporte.historial"> 📜 Historial académico
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13px;color:#1E3278;cursor:pointer;">
+          <input type="checkbox" [(ngModel)]="seccionesReporte.actividades"> 📋 Actividades / Asistencia
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13px;color:#1E3278;cursor:pointer;">
+          <input type="checkbox" [(ngModel)]="seccionesReporte.monitoreo"> 📈 Monitoreo
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13px;color:#1E3278;cursor:pointer;">
+          <input type="checkbox" [(ngModel)]="seccionesReporte.evaluaciones"> ⭐ Evaluaciones
+        </label>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
+          <button class="btn btn-outline" (click)="mostrarPickerReporte = false">Cancelar</button>
+          <button class="btn btn-navy" (click)="generarReportePersonalizado()"><i class="fas fa-file-pdf"></i> Generar reporte</button>
+        </div>
+      </div>
+    </div>
+
+    <app-reporte-preview
+      [visible]="mostrarReporte"
+      [html]="reporteHtml"
+      tipo="perfil"
+      [modoHtml]="true"
+      [participantes]="participante ? [participante] : []"
+      [titulo]="'Expediente - ' + (participante?.primer_nombre || '') + ' ' + (participante?.primer_apellido || '')"
+      (cerrarEvent)="mostrarReporte = false">
+    </app-reporte-preview>
+</app-layout>

@@ -1,0 +1,138 @@
+<app-layout>
+  <div class="reportes-page">
+    <!-- Encabezado -->
+    <div class="page-head">
+      <div class="page-head-text">
+        <h1><i class="fas fa-file-pdf"></i> Informes y Reportes</h1>
+        <p>Centraliza los reportes del sistema. Todas las salidas se descargan unicamente en PDF o Excel.</p>
+      </div>
+      <span class="chip-programa" [style.background]="alcance.color" [style.color]="'#fff'">
+        <i class="fas fa-layer-group"></i> {{ alcance.etiqueta }}
+      </span>
+    </div>
+
+    <div class="alert-error" *ngIf="error"><i class="fas fa-exclamation-circle"></i> {{ error }}</div>
+
+    <div class="toast-anadesa" [class.toast-success]="mensaje?.tipo === 'success'" [class.toast-error]="mensaje?.tipo === 'error'" *ngIf="mensaje">
+      <i class="fas" [ngClass]="mensaje?.tipo === 'success' ? 'fa-check-circle' : 'fa-times-circle'"></i> {{ mensaje?.texto }}
+    </div>
+
+    <!-- Contadores -->
+    <div class="stats-grid">
+      <div class="stat-card" *ngFor="let c of contadores">
+        <div class="stat-icon" [style.background]="c.bg" [style.color]="c.color">
+          <i class="fas" [ngClass]="c.icono"></i>
+        </div>
+        <div class="stat-info">
+          <span class="stat-label">{{ c.titulo }}</span>
+          <span class="stat-value">{{ cargando ? '...' : c.valor }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Solo consulta -->
+    <div class="aviso-solo-lectura" *ngIf="!puedeGenerar && !cargando">
+      <i class="fas fa-info-circle"></i>
+      Tiene acceso de consulta al modulo de reportes, pero no permiso para generar archivos.
+    </div>
+
+    <!-- Filtro avanzado de participantes -->
+    <div class="panel-filtro" *ngIf="puedeConsultar(3)">
+      <div class="panel-filtro-head">
+        <h2><i class="fas fa-filter"></i> Filtro avanzado de participantes</h2>
+        <span class="conteo">{{ participantesFiltrados.length }} registro(s)</span>
+      </div>
+      <div class="filtros">
+        <label class="campo">
+          <span>Programa</span>
+          <select [(ngModel)]="filtroPrograma">
+            <option value="">Todos los programas</option>
+            <option *ngFor="let p of programasDisponibles" [value]="p.key">{{ p.label }}</option>
+          </select>
+        </label>
+        <label class="campo">
+          <span>Estado</span>
+          <select [(ngModel)]="filtroEstado">
+            <option value="todos">Todos</option>
+            <option value="activos">Solo activos</option>
+            <option value="inactivos">Solo inactivos</option>
+          </select>
+        </label>
+        <label class="campo campo-busqueda">
+          <span>Buscar</span>
+          <input type="text" [(ngModel)]="busqueda" placeholder="Nombre o correo...">
+        </label>
+      </div>
+      <div class="tabla-scroll" *ngIf="participantesFiltrados.length; else sinRegistros">
+        <table class="tabla-participantes">
+          <thead>
+            <tr>
+              <th>No.</th>
+              <th>Nombre</th>
+              <th>Programa</th>
+              <th>Categoria</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let p of participantesFiltrados; let i = index">
+              <td>{{ i + 1 }}</td>
+              <td>{{ p.primer_nombre }} {{ p.segundo_nombre || '' }} {{ p.primer_apellido }} {{ p.segundo_apellido || '' }}</td>
+              <td>{{ p.programa_nombre || '-' }}</td>
+              <td>{{ p.categoria_nombre || '-' }}</td>
+              <td>
+                <span class="badge" [class.badge-ok]="p.estado" [class.badge-off]="!p.estado">
+                  {{ p.estado ? 'Activo' : 'Inactivo' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ng-template #sinRegistros><p class="vacio">Sin participantes para el filtro actual.</p></ng-template>
+    </div>
+
+    <!-- Tarjetas de reportes -->
+    <div class="tarjetas-grid" *ngIf="tarjetas.length; else sinTarjetas">
+      <div class="tarjeta" *ngFor="let t of tarjetas">
+        <div class="tarjeta-head">
+          <div class="tarjeta-icono" [style.background]="t.bg" [style.color]="t.color">
+            <i class="fas" [ngClass]="t.icono"></i>
+          </div>
+          <div>
+            <h3>{{ t.nombre }}</h3>
+            <p>{{ t.descripcion }}</p>
+          </div>
+        </div>
+        <div class="tarjeta-opciones">
+          <button class="btn-opcion" *ngFor="let op of t.opciones"
+                  [disabled]="!puedeGenerar || generando"
+                  [class.sin-permiso]="!puedeGenerar"
+                  (click)="generar(t, op.tipo)">
+            <i class="fas" [ngClass]="op.icono"></i>
+            {{ op.label }}
+          </button>
+        </div>
+        <div class="tarjeta-pie">
+          <span><i class="fas fa-file-pdf"></i> <i class="fas fa-file-excel"></i> PDF / Excel</span>
+        </div>
+      </div>
+    </div>
+    <ng-template #sinTarjetas>
+      <div class="vacio-grande">
+        <i class="fas fa-lock"></i>
+        <p>No tiene modulos de reportes disponibles.</p>
+      </div>
+    </ng-template>
+  </div>
+
+  <app-reporte-preview
+    [visible]="mostrarReporte"
+    [html]="reporteHtml"
+    [tipo]="reporteTipo"
+    [participantes]="reporteLista"
+    [titulo]="reporteTitulo"
+    [modoHtml]="reporteModoHtml"
+    (cerrarEvent)="mostrarReporte = false">
+  </app-reporte-preview>
+</app-layout>

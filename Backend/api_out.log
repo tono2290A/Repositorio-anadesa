@@ -1,0 +1,4 @@
+Entre las posibles razones para esto se incluyen:
+  * Escribió de manera incorrecta un comando dotnet integrado.
+  * Tenía previsto ejecutar un programa .NET, pero dotnet-D:\DECIMO no existe.
+  * Tuvo la intención de ejecutar una herramienta global, pero no se encontró un ejecutable con el prefijo dotnet con este nombre en la ruta.

@@ -1,0 +1,57 @@
+<app-layout>
+  <div class="dashboard-layout">
+    <app-panel-historial></app-panel-historial>
+
+    <div class="dashboard-main">
+      <div class="dashboard-header">
+    <div>
+      <h4><i class="fas fa-tachometer-alt me-2"></i>Dashboard</h4>
+      <p class="text-muted mb-0">Panel principal del sistema ANADESA</p>
+    </div>
+    <span class="programa-chip"
+      [style.color]="alcanceService.color"
+      [style.border-color]="alcanceService.color"
+      [style.background]="alcanceService.color + '14'">
+      <i class="fas" [ngClass]="alcanceService.alcance === 'mujeres' ? 'fa-venus' : (alcanceService.alcance === 'educacion' ? 'fa-graduation-cap' : 'fa-layer-group')"></i>
+      {{ alcanceService.etiqueta }}
+    </span>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card" *ngFor="let card of cards; let i = index"
+         [style.animation-delay]="(i * 0.1) + 's'">
+      <div class="stat-icon" [style.background]="card.bg" [style.color]="card.color">
+        <i class="fas" [ngClass]="card.icon"></i>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">{{ card.title }}</span>
+        <span class="stat-value">{{ card.value }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MÓDULOS DEL SISTEMA -->
+  <div class="modulos-section">
+    <div class="section-header">
+      <h5><i class="fas fa-th-large me-2"></i>Módulos del Sistema</h5>
+      <p class="text-muted">Acceso rápido a las funcionalidades</p>
+    </div>
+    <div class="modulos-grid">
+      <div class="modulo-card" *ngFor="let modulo of modulos; let i = index"
+           [style.animation-delay]="(i * 0.05) + 's'"
+           (click)="navegar(modulo.ruta)">
+        <div class="modulo-header" [style.background]="modulo.gradient">
+          <div class="modulo-icono">
+            <i class="fas" [ngClass]="modulo.icon"></i>
+          </div>
+        </div>
+        <div class="modulo-body">
+          <span class="modulo-nombre">{{ modulo.nombre }}</span>
+          <span class="modulo-desc">{{ modulo.descripcion }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+</app-layout>

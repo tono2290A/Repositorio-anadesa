@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="180" viewBox="0 0 200 180">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#87CEEB"/>
+      <stop offset="100%" stop-color="#B0E0F0"/>
+    </linearGradient>
+  </defs>
+  <!-- Sky background -->
+  <rect width="200" height="180" rx="10" fill="url(#sky)"/>
+  <!-- Sun -->
+  <circle cx="100" cy="72" r="14" fill="#F4A300"/>
+  <!-- Mountains -->
+  <path d="M30 105 Q65 55 100 85 Q135 55 170 105 Z" fill="#228B22"/>
+  <path d="M50 105 Q80 70 110 90 Q140 70 160 105 Z" fill="#32CD32"/>
+  <!-- Water -->
+  <path d="M30 105 Q65 115 100 105 Q135 115 170 105 L170 115 Q135 125 100 115 Q65 125 30 115 Z" fill="#4A90D9"/>
+  <!-- Waves -->
+  <path d="M30 110 Q50 107 70 110 Q90 113 110 110 Q130 107 150 110 Q170 113 170 110" fill="none" stroke="#3A7BC8" stroke-width="1.5"/>
+  <path d="M30 116 Q50 113 70 116 Q90 119 110 116 Q130 113 150 116 Q170 119 170 116" fill="none" stroke="#3A7BC8" stroke-width="1"/>
+  <!-- Bottom section -->
+  <rect x="0" y="120" width="200" height="60" rx="0" fill="#fff"/>
+  <rect x="0" y="120" width="200" height="3" fill="#228B22"/>
+  <!-- Text ANADESA -->
+  <text x="100" y="155" text-anchor="middle" font-family="Georgia,serif" font-size="28" font-weight="bold" fill="#1E3278" letter-spacing="3">ANADESA</text>
+</svg>

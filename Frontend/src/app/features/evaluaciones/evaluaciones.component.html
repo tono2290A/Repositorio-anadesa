@@ -1,0 +1,627 @@
+<app-layout>
+  <div class="page-header">
+    <div class="header-left">
+      <h4 class="page-title"><i class="fas fa-clipboard-check" style="color: #DC2626; margin-right: 10px;"></i>Evaluación</h4>
+      <span class="seccion-tag">{{ etiquetaSeccion }}</span>
+      <span class="seccion-tag badge-soloobs" *ngIf="soloObservaciones" style="background:#FEF3C7;color:#92400E;">Solo observaciones</span>
+    </div>
+    <div class="header-actions">
+      <div class="dropdown-reporte" *ngIf="puede('Generar Reportes')">
+        <button class="btn btn-outline" (click)="mostrarMenuReporte = !mostrarMenuReporte">
+          <i class="fas fa-file-pdf"></i> Reporte <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
+        </button>
+        <div class="dropdown-menu-reporte" *ngIf="mostrarMenuReporte">
+          <button (click)="generarReporte('general')"><i class="fas fa-file-alt"></i> Reporte general</button>
+          <button *ngIf="alcanceService.permite('educacion')" (click)="generarReporte('educacion')"><i class="fas fa-graduation-cap"></i> Programa Educación</button>
+          <button *ngIf="alcanceService.permite('mujeres')" (click)="generarReporte('mujeres')"><i class="fas fa-female"></i> Programa Mujeres</button>
+        </div>
+      </div>
+      <button class="btn btn-outline" *ngIf="puedeRegistrar() && modo !== 'individual'" (click)="abrirMasivo()">
+        <i class="fas fa-bolt"></i> Evaluación masiva
+      </button>
+      <button class="btn btn-navy" *ngIf="puedeRegistrar()" (click)="abrirCrear()">
+        <i class="fas fa-plus"></i> Registrar evaluación
+      </button>
+    </div>
+  </div>
+
+  <!-- Pestañas de programa -->
+  <app-programas-tabs [activo]="subTab" (activoChange)="cambiarPrograma($event)" [conteos]="conteoTabs"></app-programas-tabs>
+
+  <!-- Modal registro masivo -->
+  <div class="modal-overlay" *ngIf="mostrarMasivo" (click)="cerrarMasivo()">
+    <div class="modal-panel modal-xl" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2><i class="fas fa-bolt"></i> Evaluación masiva — {{ etiquetaSeccion }}</h2>
+        <span class="seccion-tag">{{ seleccionados.size }} seleccionado(s)</span>
+        <button class="modal-close" (click)="cerrarMasivo()"><i class="fas fa-times"></i></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="alert-error" *ngIf="errorMasivo"><i class="fas fa-exclamation-circle"></i> {{ errorMasivo }}</div>
+
+        <div class="form-grid" *ngIf="puedeRegistrar()">
+          <div class="form-group" *ngIf="modo === 'grupo'">
+            <label>Grupo</label>
+            <select class="form-input" [(ngModel)]="masivo.id_grupo" (ngModelChange)="cargarParticipantesMasivo()">
+              <option *ngFor="let g of gruposVisibles" [ngValue]="g.id_grupo">{{ g.nombre }} — {{ g.programa }}</option>
+            </select>
+            <small class="campo-hint" *ngIf="grupoMasivo">Se listan los participantes asignados al grupo <strong>{{ grupoMasivo.nombre }}</strong></small>
+          </div>
+          <div class="form-group" *ngIf="modo === 'actividad'">
+            <label>Actividad</label>
+            <select class="form-input" [(ngModel)]="masivo.id_programacion" (ngModelChange)="cargarParticipantesMasivo()">
+              <option *ngFor="let a of actividadesVisibles" [ngValue]="a.id_programacion">{{ a.nombre }} — {{ a.fecha }}</option>
+            </select>
+            <small class="campo-hint" *ngIf="masivo.id_programacion">Se listan los participantes de esa actividad</small>
+          </div>
+          <div class="form-group">
+            <label>Fecha de la evaluación *</label>
+            <input type="date" class="form-input" [(ngModel)]="masivo.fecha">
+          </div>
+          <div class="form-group">
+            <label>Resultado</label>
+            <select class="form-input" [(ngModel)]="masivo.resultado" [disabled]="soloObservaciones || !masivo.nivel">
+              <option value="">— Se deriva del nivel —</option>
+              <option *ngFor="let r of resultados" [value]="r">{{ r }}</option>
+            </select>
+            <small class="campo-hint" *ngIf="!masivo.nivel">Sin nivel: el resultado queda en blanco (solo observaciones).</small>
+          </div>
+          <div class="form-group full" *ngIf="!soloObservaciones">
+            <label>Nivel de evaluación * <small style="color:#64748B;font-weight:500;">(puntuación = nivel × 20 en cada criterio)</small></label>
+            <div class="nivel-chips">
+              <button type="button" class="nivel-chip"
+                      *ngFor="let n of niveles"
+                      [ngClass]="['n' + n.nivel, masivo.nivel === n.nivel ? 'active' : '']"
+                      [disabled]="soloObservaciones"
+                      (click)="elegirNivelMasivo(n.nivel)">
+                {{ n.nivel }} <small>{{ n.etiqueta }}</small>
+              </button>
+            </div>
+            <p class="nivel-preview" *ngIf="masivo.nivel">
+              Nivel <strong>{{ masivo.nivel }} — {{ etiquetaNivel(masivo.nivel) }}</strong> →
+              resultado <strong>{{ masivo.resultado || resultadoAutomatico(masivo.nivel) }}</strong>
+            </p>
+          </div>
+          <div class="form-group full">
+            <label>Observaciones <span *ngIf="soloObservaciones">*</span></label>
+            <textarea class="form-input" rows="2" [(ngModel)]="masivo.observaciones"
+                      placeholder="Observaciones de la evaluación"></textarea>
+            <small class="campo-hint" *ngIf="soloObservaciones">Su rol solo permite registrar observaciones de cumplimiento.</small>
+          </div>
+        </div>
+
+        <div class="masivo-body" *ngIf="puedeRegistrar()">
+          <div class="masivo-toolbar">
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" class="form-input" placeholder="Buscar participante..." [(ngModel)]="buscarParticipante">
+            </div>
+            <label class="check-todos" *ngIf="participantesVisibles.length > 0">
+              <input type="checkbox" [checked]="todosSeleccionados" (change)="seleccionarTodos()">
+              Seleccionar todos
+            </label>
+          </div>
+
+          <div class="loading-state" *ngIf="cargandoParticipantes" style="height:150px;">
+            <div class="spinner-sm"></div><span>Cargando participantes...</span>
+          </div>
+
+          <div class="empty-state" *ngIf="!cargandoParticipantes && participantesVisibles.length === 0" style="height:150px;">
+            <i class="fas fa-users"></i>
+            <p>No hay participantes para esta selección</p>
+          </div>
+
+          <div class="participantes-lista" *ngIf="!cargandoParticipantes && participantesVisibles.length > 0">
+            <label class="participante-item" *ngFor="let p of participantesVisibles">
+              <input type="checkbox" [checked]="seleccionados.has(p.id_participante)" (change)="toggleSeleccion(p.id_participante)">
+              <div class="participante-info">
+                <span class="participante-nombre">{{ p.nombre }}</span>
+                <span class="participante-meta">{{ p.programa }} • {{ p.categoria }}<span *ngIf="p.dpi"> • DPI: {{ p.dpi }}</span></span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="sin-permiso" *ngIf="!puedeRegistrar()">
+          <i class="fas fa-lock"></i> No tiene permiso para registrar evaluaciones.
+        </div>
+      </div>
+
+      <div class="modal-footer" *ngIf="puedeRegistrar()">
+        <button class="btn btn-outline" (click)="cerrarMasivo()" [disabled]="saving">Cancelar</button>
+        <button class="btn btn-navy" (click)="guardarMasivo()" [disabled]="saving">
+          <i class="fas" [ngClass]="saving ? 'fa-spinner fa-spin' : 'fa-check-double'"></i>
+          Guardar evaluación masiva
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="filters-bar">
+    <div class="search-box">
+      <i class="fas fa-search"></i>
+      <input type="text" class="form-input" placeholder="Buscar participante, actividad, grupo..." [(ngModel)]="search">
+    </div>
+    <select class="form-input select-estado" [(ngModel)]="fResultado">
+      <option value="">Todos los resultados</option>
+      <option *ngFor="let r of resultadosFiltrados" [value]="r">{{ r }}</option>
+    </select>
+    <button class="btn-sort" (click)="toggleSort()">
+      <i class="fas fa-sort-alpha-down" *ngIf="sortDir === 'asc'"></i>
+      <i class="fas fa-sort-alpha-up" *ngIf="sortDir === 'desc'"></i>
+      {{ sortDir === 'asc' ? 'A → Z' : 'Z → A' }}
+    </button>
+  </div>
+
+  <!-- Error general -->
+  <div class="alert-error" *ngIf="error && !loading"><i class="fas fa-exclamation-circle"></i> {{ error }} <button type="button" class="btn-reintentar" (click)="load()">Reintentar</button></div>
+
+  <!-- Tarjetas de evaluación -->
+  <div class="cards-wrap">
+    <div class="loading-state" *ngIf="loading">
+      <div class="spinner-sm"></div>
+      <span>Cargando evaluaciones...</span>
+    </div>
+
+    <div class="empty-state" *ngIf="!loading && filtered.length === 0">
+      <i class="fas fa-clipboard-check"></i>
+      <p>Sin evaluaciones en esta sección</p>
+    </div>
+
+    <div class="cards-grid" *ngIf="!loading && filtered.length > 0">
+      <!-- Secciones Actividad / Grupo: UNA cajita por actividad o por grupo -->
+      <article class="monitoreo-card" *ngFor="let t of tarjetas">
+        <div class="card-top">
+          <span class="badge" [ngClass]="modo === 'grupo' ? 'badge-teal' : 'badge-blue'">{{ t.tipo }}</span>
+          <span class="badge badge-navy">{{ t.registros.length }} participantes</span>
+        </div>
+
+        <h5 class="card-title">
+          <i class="fas" [ngClass]="modo === 'actividad' ? 'fa-calendar-check' : 'fa-users'"></i>
+          {{ t.titulo }}
+        </h5>
+        <p class="card-sub" *ngIf="t.subtitulo">{{ t.subtitulo }}</p>
+
+        <div class="card-meta">
+          <span><i class="fas fa-calendar-alt"></i> {{ t.fecha || '—' }}</span>
+          <span><i class="fas fa-user-shield"></i> {{ t.responsable || '—' }}</span>
+        </div>
+
+        <div class="card-meta" *ngIf="t.programa">
+          <span><i class="fas fa-graduation-cap"></i> {{ t.programa }}</span>
+        </div>
+
+        <p class="card-obs" *ngIf="t.resumen">
+          <i class="fas fa-chart-bar"></i> {{ t.resumen }}
+        </p>
+
+        <div class="card-actions">
+          <button class="btn-icon-sm btn-detail" title="Ver participantes evaluados" (click)="verDetalleTarjeta(t)">
+            <i class="fas fa-eye"></i> Detalles
+          </button>
+          <button class="btn-icon-sm btn-report" title="Reporte PDF" (click)="reporteTarjeta(t)" *ngIf="puede('Generar Reportes')">
+            <i class="fas fa-file-pdf"></i>
+          </button>
+        </div>
+      </article>
+
+      <!-- Sección Individual: una cajita por participante -->
+      <ng-container *ngIf="!esAgrupado">
+      <article class="monitoreo-card" *ngFor="let e of filtered">
+        <div class="card-top">
+          <span class="badge badge-purple">{{ e.tipo_evaluacion || '—' }}</span>
+          <span class="badge" [ngClass]="badgeNivel(e)">{{ e.nivel ? 'Nivel ' + e.nivel : 'Solo obs.' }}</span>
+        </div>
+
+        <h5 class="card-title">
+          <i class="fas fa-user"></i>
+          {{ tituloCard(e) }}
+        </h5>
+        <p class="card-sub">{{ subtituloCard(e) }}</p>
+
+        <div class="card-meta">
+          <span><i class="fas fa-calendar-alt"></i> {{ e.fecha || '—' }}</span>
+          <span><i class="fas fa-user-shield"></i> {{ e.evaluado_por || '—' }}</span>
+        </div>
+
+        <div class="card-meta" *ngIf="e.programa">
+          <span><i class="fas fa-graduation-cap"></i> {{ e.programa }}</span>
+          <span *ngIf="e.grupo"><i class="fas fa-users"></i> {{ e.grupo }}</span>
+        </div>
+
+        <div class="card-meta" *ngIf="e.resultado_general">
+          <span><i class="fas fa-tasks"></i> {{ e.resultado_general }}
+            <span *ngIf="e.nivel" style="color:#64748B;">({{ etiquetaNivel(e.nivel) }})</span>
+          </span>
+        </div>
+
+        <p class="card-obs" *ngIf="e.observaciones">
+          <i class="fas fa-comment-dots"></i> {{ e.observaciones }}
+        </p>
+
+        <div class="card-actions">
+          <button class="btn-icon-sm btn-detail" title="Ver detalles" (click)="verFicha(e)">
+            <i class="fas fa-eye"></i> Detalles
+          </button>
+          <button class="btn-icon-sm btn-report" title="Reporte PDF del registro" (click)="reporteIndividual(e)" *ngIf="puede('Generar Reportes')">
+            <i class="fas fa-file-pdf"></i>
+          </button>
+          <button class="btn-icon-sm btn-edit" title="Editar" (click)="abrirEditar(e)" *ngIf="puede('Actualizar')">
+            <i class="fas fa-pen"></i>
+          </button>
+          <button class="btn-icon-sm btn-delete" title="Eliminar" (click)="confirmarEliminar(e)" *ngIf="puede('Eliminar')">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </article>
+      </ng-container>
+    </div>
+  </div>
+
+  <!-- Modal Crear/Editar -->
+  <div class="modal-overlay" *ngIf="mostrarModal" (click)="cerrarModal()">
+    <div class="modal-panel modal-md" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2><i class="fas fa-clipboard-check"></i> {{ editando ? 'Editar evaluación' : 'Registrar evaluación' }}</h2>
+        <button class="modal-close" (click)="cerrarModal()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert-error" *ngIf="errorModal"><i class="fas fa-exclamation-circle"></i> {{ errorModal }}</div>
+
+        <div class="form-grid">
+          <div class="form-group" *ngIf="modo === 'grupo'">
+            <label>Grupo *</label>
+            <select class="form-input" [(ngModel)]="form.id_grupo" (ngModelChange)="cambiaGrupoOCategoria()">
+              <option [ngValue]="null">Seleccione un grupo</option>
+              <option *ngFor="let g of gruposVisibles" [ngValue]="g.id_grupo">{{ g.nombre }} — {{ g.programa }}</option>
+            </select>
+            <small class="campo-hint" *ngIf="grupoForm">Participantes asignados al grupo: <strong>{{ grupoForm.nombre }}</strong></small>
+          </div>
+          <div class="form-group" *ngIf="modo === 'actividad'">
+            <label>Actividad *</label>
+            <select class="form-input" [(ngModel)]="form.id_programacion" (ngModelChange)="cambiaGrupoOCategoria()">
+              <option [ngValue]="null">Seleccione una actividad</option>
+              <option *ngFor="let a of actividadesVisibles" [ngValue]="a.id_programacion">{{ a.nombre }} — {{ a.fecha }}</option>
+            </select>
+            <small class="campo-hint" *ngIf="form.id_programacion">Participantes de esa actividad</small>
+          </div>
+          <div class="form-group full" *ngIf="esLoteForm">
+            <label>Participantes <span class="sel-count">({{ selForm.size }}/{{ participantesForm.length }} marcados)</span></label>
+            <small class="campo-hint">Se registrará la evaluación de una vez para todos los participantes marcados (todos vienen marcados por defecto).</small>
+            <div class="alert-error" *ngIf="falloParticipantesForm">
+              <i class="fas fa-exclamation-circle"></i> No se pudieron cargar los participantes.
+              <button type="button" class="btn-reintentar" (click)="reintentarParticipantes()">Reintentar</button>
+            </div>
+            <div class="check-todos" *ngIf="!faltaSeleccionSeccion && participantesForm.length > 0">
+              <input type="checkbox" [checked]="todosSelForm" (change)="alternarTodosSelForm()">
+              Seleccionar todos
+            </div>
+            <div class="empty-state" *ngIf="faltaSeleccionSeccion">
+              <i class="fas fa-hand-pointer"></i>
+              <p>Primero seleccione {{ modo === 'grupo' ? 'el grupo' : 'la actividad' }} para cargar sus participantes.</p>
+            </div>
+            <div class="participantes-lista" *ngIf="!faltaSeleccionSeccion && participantesForm.length > 0">
+              <label class="participante-item" *ngFor="let p of participantesForm">
+                <input type="checkbox" [checked]="selForm.has(p.id_participante)" (change)="toggleSelForm(p.id_participante)">
+                <div class="participante-info">
+                  <span class="participante-nombre">{{ p.nombre }}</span>
+                  <span class="participante-meta">{{ p.programa }} / {{ p.categoria }}</span>
+                </div>
+              </label>
+            </div>
+            <div class="empty-state" *ngIf="!faltaSeleccionSeccion && participantesForm.length === 0">
+              <i class="fas fa-users"></i>
+              <p>No hay participantes asignados {{ modo === 'grupo' ? 'a este grupo' : 'a esta actividad' }}.</p>
+            </div>
+          </div>
+          <div class="form-group full" *ngIf="!esLoteForm">
+            <label>Participante *</label>
+            <select class="form-input" [(ngModel)]="form.id_participante">
+              <option [ngValue]="null" disabled>Seleccione un participante</option>
+              <option *ngFor="let p of participantesForm" [ngValue]="p.id_participante">{{ p.nombre }} — {{ p.programa }} / {{ p.categoria }}</option>
+            </select>
+            <div class="alert-error" *ngIf="falloParticipantesForm">
+              <i class="fas fa-exclamation-circle"></i> No se pudieron cargar los participantes.
+              <button type="button" class="btn-reintentar" (click)="reintentarParticipantes()">Reintentar</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Fecha de la evaluación *</label>
+            <input type="date" class="form-input" [(ngModel)]="form.fecha">
+          </div>
+          <div class="form-group">
+            <label>Tipo de evaluación</label>
+            <select class="form-input" [(ngModel)]="form.tipo_evaluacion" [disabled]="!editando">
+              <option *ngFor="let t of tiposFormulario" [value]="t">{{ t }}</option>
+            </select>
+          </div>
+          <div class="form-group full" *ngIf="!soloObservaciones">
+            <label>Nivel de evaluación * <small style="color:#64748B;font-weight:500;">(puntuación = nivel × 20 en cada criterio)</small></label>
+            <div class="nivel-chips">
+              <button type="button" class="nivel-chip"
+                      *ngFor="let n of niveles"
+                      [ngClass]="['n' + n.nivel, form.nivel === n.nivel ? 'active' : '']"
+                      [disabled]="soloObservaciones"
+                      (click)="elegirNivel(n.nivel)">
+                {{ n.nivel }} <small>{{ n.etiqueta }}</small>
+              </button>
+            </div>
+            <p class="nivel-preview" *ngIf="form.nivel">
+              Nivel <strong>{{ form.nivel }} — {{ etiquetaNivel(form.nivel) }}</strong> →
+              puntuación <strong>{{ form.nivel * 20 }}/100</strong> por criterio
+            </p>
+          </div>
+          <div class="form-group">
+            <label>Resultado</label>
+            <select class="form-input" [(ngModel)]="form.resultado" [disabled]="soloObservaciones || !form.nivel">
+              <option value="">— Se deriva del nivel —</option>
+              <option *ngFor="let r of resultados" [value]="r">{{ r }}</option>
+            </select>
+            <small class="campo-hint" *ngIf="!form.nivel && !soloObservaciones">Seleccione primero el nivel.</small>
+            <small class="campo-hint" *ngIf="soloObservaciones">Sin nivel: el resultado queda en blanco (solo observaciones).</small>
+          </div>
+          <div class="form-group full">
+            <label>Observaciones <span *ngIf="soloObservaciones">*</span></label>
+            <textarea class="form-input" rows="3" [(ngModel)]="form.observaciones"
+                      placeholder="Observaciones de la evaluación"></textarea>
+            <small class="campo-hint" *ngIf="soloObservaciones">Su rol solo permite registrar observaciones de cumplimiento.</small>
+          </div>
+          <div class="form-group full" *ngIf="criterios.length > 0 && !soloObservaciones">
+            <label>Criterios aplicables</label>
+            <div class="criterios-chips">
+              <span *ngFor="let c of criterios">{{ c.nombre }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="cerrarModal()" [disabled]="saving">Cancelar</button>
+        <button class="btn btn-navy" (click)="guardar()" [disabled]="saving">
+          <i class="fas" [ngClass]="saving ? 'fa-spinner fa-spin' : 'fa-check'"></i>
+          {{ saving ? 'Guardando...' : (editando ? 'Actualizar' : 'Registrar') }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diálogo de confirmación -->
+  <div class="modal-overlay" *ngIf="mostrarDialogo" (click)="cancelarDialogo()">
+    <div class="dialog"
+         [ngClass]="dialogoTipo === 'delete' ? 'dialog-danger' : (dialogoTipo === 'lote' ? 'dialog-info' : (dialogoTipo === 'update' ? 'dialog-warning' : 'dialog-create'))"
+         (click)="$event.stopPropagation()">
+      <div class="dialog-icon">
+        <i class="fas" [ngClass]="{
+          'fa-exclamation-triangle': dialogoTipo === 'delete',
+          'fa-exclamation-circle': dialogoTipo === 'update',
+          'fa-layer-group': dialogoTipo === 'lote',
+          'fa-check-circle': dialogoTipo === 'create'
+        }"></i>
+      </div>
+
+      <h3 *ngIf="dialogoTipo === 'create'">¿Registrar evaluación?</h3>
+      <h3 *ngIf="dialogoTipo === 'update'">¿Actualizar evaluación?</h3>
+      <h3 *ngIf="dialogoTipo === 'delete'">¿Eliminar evaluación?</h3>
+      <h3 *ngIf="dialogoTipo === 'lote'">¿Guardar evaluación masiva?</h3>
+
+      <p *ngIf="dialogoTipo === 'create'">
+        Se evaluará a <strong>{{ nombreParticipante(form.id_participante) }}</strong>
+        <ng-container *ngIf="form.nivel"> con nivel <strong>{{ form.nivel }} — {{ etiquetaNivel(form.nivel) }}</strong></ng-container>
+        <ng-container *ngIf="!form.nivel"> registrando <strong>solo observaciones</strong></ng-container>.
+      </p>
+      <p *ngIf="dialogoTipo === 'update'">
+        Los cambios se guardarán
+        <ng-container *ngIf="form.nivel"> con nivel <strong>{{ form.nivel }} — {{ etiquetaNivel(form.nivel) }}</strong></ng-container>
+        <ng-container *ngIf="!form.nivel"> como <strong>solo observaciones</strong></ng-container>.
+      </p>
+      <p *ngIf="dialogoTipo === 'delete'">Se eliminará la evaluación de <strong>{{ dialogoItem?.participante }}</strong>. Esta acción no se puede deshacer.</p>
+      <p *ngIf="dialogoTipo === 'lote'">
+        Se registrarán <strong>{{ dialogoLoteCantidad }}</strong> evaluación(es)
+        <ng-container *ngIf="dialogoLoteNivel"> con nivel <strong>{{ dialogoLoteNivel }} — {{ etiquetaNivel(dialogoLoteNivel) }}</strong></ng-container>
+        <ng-container *ngIf="!dialogoLoteNivel"> con <strong>solo observaciones</strong></ng-container>.
+      </p>
+
+      <div class="dialog-buttons">
+        <button class="btn btn-outline" (click)="cancelarDialogo()">Cancelar</button>
+        <button class="btn"
+                [ngClass]="dialogoTipo === 'delete' ? 'btn-danger' : (dialogoTipo === 'update' ? 'btn-warning' : 'btn-create')"
+                (click)="ejecutarAccion()">
+          {{ dialogoTipo === 'delete' ? 'Eliminar' : dialogoTipo === 'update' ? 'Actualizar' : (dialogoTipo === 'lote' ? 'Guardar' : 'Registrar') }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detalle de la tarjeta: participantes evaluados en la actividad / grupo -->
+  <div class="modal-overlay" *ngIf="mostrarDetalleTarjeta && detalleTarjeta" (click)="cerrarDetalleTarjeta()">
+    <div class="modal-panel modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>
+          <i class="fas" [ngClass]="modo === 'grupo' ? 'fa-users' : 'fa-calendar-check'"></i>
+          Detalle de {{ detalleTarjeta!.tipo === 'Actividad' ? 'la actividad' : 'el grupo' }}: {{ detalleTarjeta!.titulo }}
+        </h2>
+        <button class="modal-close" (click)="cerrarDetalleTarjeta()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="detalle-resumen">
+          <span><i class="fas fa-calendar-alt"></i> {{ detalleTarjeta!.fecha || '—' }}</span>
+          <span><i class="fas fa-user-shield"></i> {{ detalleTarjeta!.responsable || '—' }}</span>
+          <span *ngIf="detalleTarjeta!.programa"><i class="fas fa-graduation-cap"></i> {{ detalleTarjeta!.programa }}</span>
+          <span><i class="fas fa-users"></i> {{ detalleTarjeta!.registros.length }} participante(s)</span>
+          <span *ngIf="detalleTarjeta!.resumen"><i class="fas fa-chart-bar"></i> {{ detalleTarjeta!.resumen }}</span>
+        </div>
+
+        <div class="detalle-tabla-wrap">
+          <table class="detalle-tabla">
+            <thead>
+              <tr>
+                <th>No.</th>
+                <th>Participante</th>
+                <th>Nivel</th>
+                <th>Resultado</th>
+                <th>Fecha</th>
+                <th>Observaciones</th>
+                <th class="d-acciones">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let r of detalleTarjeta!.registros; let i = index">
+                <td>{{ i + 1 }}</td>
+                <td class="d-nombre">{{ r.participante }}</td>
+                <td><span class="badge" [ngClass]="badgeNivel(r)">{{ r.nivel ? 'Nivel ' + r.nivel : 'Solo obs.' }}</span></td>
+                <td>{{ r.resultado_general || '—' }}</td>
+                <td>{{ r.fecha || '—' }}</td>
+                <td class="d-obs">{{ r.observaciones || '—' }}</td>
+                <td class="d-acciones">
+                  <button class="btn-icon-sm btn-detail" title="Ver ficha" (click)="verFicha(r); cerrarDetalleTarjeta()">
+                    <i class="fas fa-eye"></i>
+                  </button>
+                  <button class="btn-icon-sm btn-edit" title="Editar" (click)="abrirEditar(r); cerrarDetalleTarjeta()" *ngIf="puede('Actualizar')">
+                    <i class="fas fa-pen"></i>
+                  </button>
+                  <button class="btn-icon-sm btn-delete" title="Eliminar" (click)="confirmarEliminar(r); cerrarDetalleTarjeta()" *ngIf="puede('Eliminar')">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="cerrarDetalleTarjeta()">Cerrar</button>
+        <button class="btn btn-navy" (click)="reporteTarjeta(detalleTarjeta!)" *ngIf="puede('Generar Reportes')">
+          <i class="fas fa-file-pdf"></i> Reporte
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ficha de la evaluación -->
+  <div class="modal-overlay" *ngIf="mostrarFicha" (click)="mostrarFicha = false">
+    <div class="modal-panel modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2><i class="fas fa-clipboard-check"></i> Ficha de evaluación</h2>
+        <button class="modal-close" (click)="mostrarFicha = false"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body" *ngIf="fichaItem">
+        <div class="loading-state" *ngIf="cargandoFicha" style="height:80px;">
+          <div class="spinner-sm"></div><span>Cargando ficha...</span>
+        </div>
+        <div class="detalle-info" *ngIf="!cargandoFicha">
+          <div class="detalle-field full">
+            <label>{{ modo === 'actividad' ? 'Actividad evaluada' : (modo === 'grupo' ? 'Grupo evaluado' : 'Participante evaluado') }}</label>
+            <span class="detalle-valor strong">{{ tituloCard(fichaItem) }}</span>
+          </div>
+          <div class="detalle-field full" *ngIf="modo !== 'individual'">
+            <label>Participante</label>
+            <span class="detalle-valor strong">{{ fichaItem.participante }}</span>
+          </div>
+          <div class="detalle-field">
+            <label>Programa</label>
+            <span class="detalle-valor">{{ fichaItem.programa || '—' }}</span>
+          </div>
+          <div class="detalle-field">
+            <label>Fecha de la evaluación</label>
+            <span class="detalle-valor">{{ fichaItem.fecha || '—' }}</span>
+          </div>
+          <div class="detalle-field">
+            <label>Tipo de evaluación</label>
+            <span class="badge badge-purple">{{ fichaItem.tipo_evaluacion || '—' }}</span>
+          </div>
+          <div class="detalle-field">
+            <label>Nivel</label>
+            <span class="badge" [ngClass]="badgeNivel(fichaItem)">{{ fichaItem.nivel ? 'Nivel ' + fichaItem.nivel + ' — ' + etiquetaNivel(fichaItem.nivel) : 'Solo observaciones' }}</span>
+          </div>
+          <div class="detalle-field">
+            <label>Resultado</label>
+            <span class="detalle-valor strong">{{ fichaItem.resultado_general || '—' }}</span>
+          </div>
+          <div class="detalle-field">
+            <label>Estado</label>
+            <span class="badge badge-green">{{ fichaItem.estado || 'Activo' }}</span>
+          </div>
+          <div class="detalle-field" *ngIf="fichaItem.grupo">
+            <label>Grupo</label>
+            <span class="detalle-valor">{{ fichaItem.grupo }}</span>
+          </div>
+          <div class="detalle-field" *ngIf="fichaItem.actividad">
+            <label>Actividad</label>
+            <span class="detalle-valor">{{ fichaItem.actividad }}</span>
+          </div>
+          <div class="detalle-field">
+            <label>Evaluado por</label>
+            <span class="detalle-valor">{{ fichaItem.evaluado_por || '—' }}</span>
+          </div>
+          <div class="detalle-field full">
+            <label>Observaciones</label>
+            <span class="detalle-valor">{{ fichaItem.observaciones || '—' }}</span>
+          </div>
+        </div>
+
+        <div *ngIf="!cargandoFicha && fichaItem.detalle && fichaItem.detalle.length > 0">
+          <div class="promedio-wrap">
+            <div class="promedio-circle">
+              <span>{{ fichaItem.promedio }}</span>
+              <small>promedio</small>
+            </div>
+            <div class="promedio-texto">
+              <strong>Resultado por criterio</strong><br>
+              Puntuación = nivel × 20 sobre 100 en cada criterio aplicable ({{ fichaItem.criterios }} criterio(s)).
+              <span *ngIf="fichaItem.nivel"> Nivel <strong>{{ fichaItem.nivel }} — {{ etiquetaNivel(fichaItem.nivel) }}</strong>.</span>
+            </div>
+          </div>
+          <table class="ficha-criterios">
+            <thead>
+              <tr>
+                <th>Criterio</th>
+                <th class="criterio-punt">Puntuación</th>
+                <th class="criterio-res">Resultado</th>
+                <th>Observaciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let d of fichaItem.detalle">
+                <td>{{ d.criterio }}</td>
+                <td class="criterio-punt">{{ d.puntuacion ?? '—' }}</td>
+                <td class="criterio-res">{{ d.resultado || '—' }}</td>
+                <td>{{ d.observaciones || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="mostrarFicha = false">Cerrar</button>
+        <button class="btn btn-navy" (click)="reporteIndividual(fichaItem!)" *ngIf="puede('Generar Reportes') && fichaItem">
+          <i class="fas fa-file-pdf"></i> Generar reporte
+        </button>
+        <button class="btn btn-warning" (click)="abrirEditar(fichaItem!); mostrarFicha = false" *ngIf="puede('Actualizar') && fichaItem">
+          <i class="fas fa-pen"></i> Editar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reporte preview -->
+  <app-reporte-preview
+    [visible]="mostrarReporte"
+    [html]="reporteHtml"
+    [titulo]="reporteTitulo"
+    [modoHtml]="true"
+    (cerrarEvent)="mostrarReporte = false">
+  </app-reporte-preview>
+
+  <!-- Toasts -->
+  <div class="toast-container">
+    <div *ngFor="let t of toasts" class="toast" [ngClass]="'toast-' + t.type">
+      <i class="fas" [ngClass]="{
+        'fa-check-circle': t.type === 'success',
+        'fa-times-circle': t.type === 'error',
+        'fa-exclamation-triangle': t.type === 'warning'
+      }"></i>
+      {{ t.message }}
+    </div>
+  </div>
+</app-layout>

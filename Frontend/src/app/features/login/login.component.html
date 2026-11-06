@@ -1,0 +1,66 @@
+<div class="login-page">
+  <!-- Panel izquierdo: marca -->
+  <aside class="login-izq"
+         [class.con-imagen]="!!(ape$ | async)?.imagen_login"
+         [style.backgroundImage]="(ape$ | async)?.imagen_login ? 'url(' + (ape$ | async)!.imagen_login + ')' : null">
+    <span class="burbuja burbuja-1"></span>
+    <span class="burbuja burbuja-2"></span>
+    <div class="login-marca">
+      <img [src]="(ape$ | async)?.logo || logoDefecto" alt="Logo" class="login-logo">
+      <h1 class="login-titulo">
+        <span class="login-titulo-marca"
+              [class.marca-larga]="(((ape$ | async)?.nombre_sistema || 'ANADESA').length) > 26">{{ (ape$ | async)?.nombre_sistema || 'ANADESA' }}</span>
+      </h1>
+      <p class="login-lema">Plataforma integral para la gestión y administración de información institucional.</p>
+    </div>
+  </aside>
+
+  <!-- Panel derecho: acceso -->
+  <main class="login-der">
+    <div class="login-card">
+      <h2 class="login-h">Iniciar sesión</h2>
+      <p class="login-sub">Ingrese sus credenciales para acceder al sistema.</p>
+
+      <form (ngSubmit)="onLogin()">
+        <label class="login-label" for="usuario">Usuario</label>
+        <div class="login-campo">
+          <i class="fas fa-user"></i>
+          <input id="usuario" type="text" class="login-input" [(ngModel)]="usuario" name="usuario"
+                 required placeholder="Ingrese su usuario" autocomplete="username">
+        </div>
+
+        <label class="login-label" for="contrasena">Contraseña</label>
+        <div class="login-campo">
+          <i class="fas fa-lock"></i>
+          <input id="contrasena" [type]="mostrarContrasena ? 'text' : 'password'" class="login-input"
+                 [(ngModel)]="contrasena" name="contrasena" required placeholder="Ingrese su contraseña"
+                 autocomplete="current-password">
+          <button type="button" class="login-ojo" (click)="mostrarContrasena = !mostrarContrasena"
+                  [attr.aria-label]="mostrarContrasena ? 'Ocultar contraseña' : 'Mostrar contraseña'">
+            <i class="fas" [ngClass]="mostrarContrasena ? 'fa-eye-slash' : 'fa-eye'"></i>
+          </button>
+        </div>
+
+        <div *ngIf="error" class="login-error" role="alert">
+          <i class="fas fa-circle-exclamation"></i>
+          <span>{{ error }}</span>
+        </div>
+
+        <div class="login-olvido">
+          <a routerLink="/forgot-password">¿Olvidó su contraseña?</a>
+        </div>
+
+        <button type="submit" class="login-btn" [disabled]="loading">
+          {{ loading ? 'Ingresando...' : 'Iniciar sesión' }}
+          <i class="fas fa-arrow-right" *ngIf="!loading"></i>
+        </button>
+      </form>
+    </div>
+
+    <footer class="login-footer">
+      <span class="login-version">Versión 1.0</span>
+      <a href="javascript:void(0)" class="login-privacidad">Política de privacidad</a>
+      <p class="login-copy">&copy; 2026 {{ (ape$ | async)?.nombre_sistema || 'ANADESA' }}. Todos los derechos reservados.</p>
+    </footer>
+  </main>
+</div>

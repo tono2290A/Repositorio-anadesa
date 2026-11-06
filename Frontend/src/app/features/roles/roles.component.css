@@ -1,0 +1,21 @@
+.table th {
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  color: #666;
+}
+
+.btn-primary-brand {
+  background-color: #1a73e8;
+  border-color: #1a73e8;
+  color: white;
+}
+
+.btn-primary-brand:hover {
+  background-color: #1557b0;
+  border-color: #1557b0;
+  color: white;
+}
+
+@media (max-width: 768px) { .roles-grid, .usuarios-grid, .cards-grid { grid-template-columns: 1fr !important; } .card { margin-bottom: 12px; } .form-input, select, input { max-width: 100% !important; } .btn { white-space: normal !important; } }
+@media (max-width: 480px) { .auth-card { margin: 12px; padding: 20px 16px !important; } .btn { width: 100%; } }

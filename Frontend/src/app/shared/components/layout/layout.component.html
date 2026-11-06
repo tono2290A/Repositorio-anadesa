@@ -1,0 +1,136 @@
+<div class="layout-wrapper">
+  <nav class="sidebar" [class.collapsed]="sidebarCollapsed" [class.mobile-open]="menuMovilAbierto">
+    <div class="sidebar-header">
+      <div class="logo-area" *ngIf="!sidebarCollapsed || esMovil">
+        <img [src]="logoUrl" alt="Logo" class="logo-img">
+        <span class="logo-text" [class.logo-text-largo]="(nombreSistema || '').length > 26" *ngIf="!sidebarCollapsed || menuMovilAbierto">{{ nombreSistema }}</span>
+      </div>
+      <img [src]="logoUrl" alt="Logo" class="logo-img logo-img-sm" *ngIf="sidebarCollapsed && !esMovil">
+      <button class="collapse-btn" *ngIf="!esMovil" (click)="sidebarCollapsed = !sidebarCollapsed">
+        <i class="fas" [class.fa-chevron-left]="!sidebarCollapsed" [class.fa-chevron-right]="sidebarCollapsed"></i>
+      </button>
+      <button class="collapse-btn" *ngIf="esMovil" (click)="cerrarMenuMovil()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <ul class="sidebar-nav">
+      <li *ngIf="tieneInicio">
+        <a routerLink="/dashboard" routerLinkActive="active">
+          <i class="fas fa-home"></i>
+          <span *ngIf="!sidebarCollapsed"> Inicio</span>
+        </a>
+      </li>
+      <li *ngIf="tieneParticipantes">
+        <a routerLink="/participantes" routerLinkActive="active">
+          <i class="fas fa-users"></i>
+          <span *ngIf="!sidebarCollapsed"> Participantes</span>
+        </a>
+      </li>
+      <li *ngIf="tieneAcademico">
+        <a routerLink="/registro-academico" routerLinkActive="active">
+          <i class="fas fa-graduation-cap"></i>
+          <span *ngIf="!sidebarCollapsed"> Registro Académico</span>
+        </a>
+      </li>
+      <li *ngIf="tieneActividades">
+        <a routerLink="/actividades" routerLinkActive="active">
+          <i class="fas fa-calendar-alt"></i>
+          <span *ngIf="!sidebarCollapsed"> Actividades</span>
+        </a>
+      </li>
+      <li *ngIf="tieneMonitoreo" [class.submenu-open]="monitoreoAbierto">
+        <a class="submenu-toggle" *ngIf="sidebarCollapsed" routerLink="/monitoreo/individual" routerLinkActive="active">
+          <i class="fas fa-chart-line"></i>
+        </a>
+        <a class="submenu-toggle" *ngIf="!sidebarCollapsed" (click)="toggleMonitoreo()">
+          <i class="fas fa-chart-line"></i>
+          <span> Monitoreo</span>
+          <i class="fas fa-chevron-down submenu-arrow"></i>
+        </a>
+        <ul class="submenu" *ngIf="!sidebarCollapsed && monitoreoAbierto">
+          <li><a routerLink="/monitoreo/individual" routerLinkActive="active">Individual</a></li>
+          <li><a routerLink="/monitoreo/grupo" routerLinkActive="active">Grupo</a></li>
+          <li><a routerLink="/monitoreo/actividad" routerLinkActive="active">Actividad</a></li>
+        </ul>
+      </li>
+      <li *ngIf="tieneEvaluacion" [class.submenu-open]="evaluacionAbierto">
+        <a class="submenu-toggle" *ngIf="sidebarCollapsed" routerLink="/evaluacion/individual" routerLinkActive="active">
+          <i class="fas fa-clipboard-check"></i>
+        </a>
+        <a class="submenu-toggle" *ngIf="!sidebarCollapsed" (click)="toggleEvaluacion()">
+          <i class="fas fa-clipboard-check"></i>
+          <span> Evaluación</span>
+          <i class="fas fa-chevron-down submenu-arrow"></i>
+        </a>
+        <ul class="submenu" *ngIf="!sidebarCollapsed && evaluacionAbierto">
+          <li><a routerLink="/evaluacion/individual" routerLinkActive="active">Individual</a></li>
+          <li><a routerLink="/evaluacion/grupo" routerLinkActive="active">Grupo</a></li>
+          <li><a routerLink="/evaluacion/actividad" routerLinkActive="active">Actividad</a></li>
+        </ul>
+      </li>
+      <li *ngIf="tieneReportes">
+        <a routerLink="/reportes" routerLinkActive="active">
+          <i class="fas fa-file-pdf"></i>
+          <span *ngIf="!sidebarCollapsed"> Reportes</span>
+        </a>
+      </li>
+      <li *ngIf="tieneConfiguracion">
+        <a routerLink="/configuracion" routerLinkActive="active">
+          <i class="fas fa-cog"></i>
+          <span *ngIf="!sidebarCollapsed"> Configuración</span>
+        </a>
+      </li>
+    </ul>
+  </nav>
+
+  <div class="sidebar-overlay" *ngIf="esMovil && menuMovilAbierto" (click)="cerrarMenuMovil()"></div>
+
+  <div class="main-content" [class.expanded]="sidebarCollapsed">
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <button class="hamburger-btn" *ngIf="esMovil" (click)="alternarMenuMovil()" aria-label="Abrir menu">
+          <i class="fas fa-bars"></i>
+        </button>
+        <span class="page-title">{{ nombreSistema }}</span>
+      </div>
+      <div class="top-bar-right">
+        <span class="user-name">{{ currentUser?.primer_nombre }} {{ currentUser?.primer_apellido }}</span>
+        <div class="dropdown">
+          <button class="user-avatar-btn" data-bs-toggle="dropdown">
+            <div class="user-avatar-circle">
+              {{ getInitials() }}
+            </div>
+            <i class="fas fa-chevron-down" style="font-size: 0.7rem; color: var(--gray-text);"></i>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li>
+              <a class="dropdown-item" href="#" (click)="logout()">
+                <i class="fas fa-sign-out-alt me-2"></i>Cerrar sesion
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </header>
+
+    <div class="content-wrapper">
+      <ng-content></ng-content>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container">
+  <div *ngFor="let toast of toasts"
+       class="toast-anadesa"
+       [class.toast-success]="toast.type === 'success'"
+       [class.toast-error]="toast.type === 'error'"
+       [class.toast-warning]="toast.type === 'warning'">
+    <i class="fas" [ngClass]="{
+      'fa-check-circle': toast.type === 'success',
+      'fa-times-circle': toast.type === 'error',
+      'fa-exclamation-triangle': toast.type === 'warning'
+    }"></i>
+    {{ toast.message }}
+  </div>
+</div>

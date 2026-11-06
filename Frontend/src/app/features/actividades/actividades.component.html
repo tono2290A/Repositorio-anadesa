@@ -1,0 +1,579 @@
+<app-layout>
+  <div class="page-header">
+    <div class="header-left">
+      <h4 class="page-title"><i class="fas fa-calendar-alt" style="color: #DC2626; margin-right: 10px;"></i>Actividades</h4>
+    </div>
+    <div class="header-actions">
+      <div class="dropdown-reporte">
+        <button class="btn btn-outline" (click)="mostrarMenuReporte = !mostrarMenuReporte">
+          <i class="fas fa-file-pdf"></i> Reporte <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
+        </button>
+        <div class="dropdown-menu-reporte" *ngIf="mostrarMenuReporte">
+          <button (click)="generarReporte('general')"><i class="fas fa-file-alt"></i> Reporte general</button>
+          <button (click)="generarReporte('finalizadas')"><i class="fas fa-check-circle"></i> Finalizadas</button>
+          <button (click)="generarReporte('curso')"><i class="fas fa-spinner"></i> En curso / Planificadas</button>
+          <button (click)="generarReporteParticipante()"><i class="fas fa-users"></i> Por participante</button>
+        </div>
+      </div>
+      <button class="btn btn-outline" (click)="cambiarPestana('grupos')"><i class="fas fa-users"></i> Grupos</button>
+      <button class="btn btn-navy" (click)="abrirCrear()"><i class="fas fa-plus"></i> Nueva actividad</button>
+    </div>
+  </div>
+
+  <!-- Pestañas del módulo -->
+  <app-programas-tabs [activo]="subTab" (activoChange)="cambiarPrograma($event)" [conteos]="conteoTabs"></app-programas-tabs>
+
+  <div class="modulo-tabs">
+    <button type="button" class="modulo-tab" [class.active]="pestanaAct === 'actividades'" (click)="cambiarPestana('actividades')">
+      <i class="fas fa-calendar-alt"></i> Actividades
+    </button>
+    <button type="button" class="modulo-tab" [class.active]="pestanaAct === 'grupos'" (click)="cambiarPestana('grupos')">
+      <i class="fas fa-users"></i> Grupos
+      <span class="modulo-tab-badge" *ngIf="gruposVisibles.length > 0">{{ gruposVisibles.length }}</span>
+    </button>
+  </div>
+
+  <ng-container *ngIf="pestanaAct === 'actividades'">
+  <!-- Filtros -->
+  <div class="filters-bar">
+    <div class="search-box">
+      <i class="fas fa-search"></i>
+      <input type="text" class="form-input" placeholder="Buscar actividad..." [(ngModel)]="search">
+    </div>
+    <select class="form-input select-estado" [(ngModel)]="fEstado">
+      <option value="">Todos los estados</option>
+      <option *ngFor="let e of estados" [value]="e">{{ e }}</option>
+    </select>
+    <button class="btn-sort" (click)="toggleSort()">
+      <i class="fas fa-sort-alpha-down" *ngIf="sortDir === 'asc'"></i>
+      <i class="fas fa-sort-alpha-up" *ngIf="sortDir === 'desc'"></i>
+      {{ sortDir === 'asc' ? 'A → Z' : 'Z → A' }}
+    </button>
+  </div>
+
+  <!-- Error -->
+  <div class="alert-error" *ngIf="error && !loading"><i class="fas fa-exclamation-circle"></i> {{ error }} <button type="button" class="btn-reintentar" (click)="load()">Reintentar</button></div>
+
+  <!-- Tabla -->
+  <div class="table-card">
+    <!-- Loading -->
+    <div class="loading-state" *ngIf="loading">
+      <div class="spinner-sm"></div>
+      <span>Cargando...</span>
+    </div>
+
+    <!-- Empty -->
+    <div class="empty-state" *ngIf="!loading && filtered.length === 0">
+      <i class="fas fa-calendar-alt"></i>
+      <p>Sin actividades</p>
+    </div>
+
+    <!-- Table -->
+    <table *ngIf="!loading && filtered.length > 0">
+      <thead>
+        <tr>
+          <th>Actividad</th>
+          <th>Programa</th>
+          <th>Tipo</th>
+          <th>Modalidad</th>
+          <th>Fecha</th>
+          <th>Lugar</th>
+          <th>Responsable</th>
+          <th>Participantes</th>
+          <th>Estado</th>
+          <th class="col-acciones">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let a of filtered">
+          <td class="td-nombre">{{ a.nombre }}</td>
+          <td>
+            <span class="badge badge-navy" *ngIf="a.programa">{{ a.programa }}</span>
+            <span *ngIf="!a.programa">—</span>
+          </td>
+          <td class="td-text">{{ a.tipo_actividad || '—' }}</td>
+          <td>
+            <span class="badge" [ngClass]="a.modalidad === 'Individual' ? 'badge-purple' : 'badge-teal'">{{ a.modalidad || 'Grupal' }}</span>
+          </td>
+          <td class="td-text">{{ a.fecha || '—' }}<span *ngIf="a.hora"> {{ hora12(a.hora) }}</span><span *ngIf="a.hora_fin"> – {{ hora12(a.hora_fin) }}</span></td>
+          <td class="td-muted">{{ a.lugar || '—' }}</td>
+          <td class="td-text">{{ a.responsable || '—' }}</td>
+          <td class="td-num">
+            <button class="btn-asignar" title="Asignar participantes" (click)="abrirAsignar(a)" *ngIf="a.id_programacion > 0">
+              {{ a.totalParticipantes ?? 0 }} <i class="fas fa-user-plus" style="font-size:10px;"></i>
+            </button>
+            <span *ngIf="!(a.id_programacion > 0)">—</span>
+          </td>
+          <td>
+            <select class="estado-select" [ngClass]="estadoBadge[a.estado || '']"
+                    *ngIf="a.id_programacion > 0"
+                    [ngModel]="a.estado"
+                    (ngModelChange)="cambiarEstadoRapido(a, $event)">
+              <option *ngFor="let e of estados" [value]="e">{{ e }}</option>
+            </select>
+            <span class="badge" [ngClass]="estadoBadge[a.estado || ''] || 'badge-gray'" *ngIf="!(a.id_programacion > 0)">{{ a.estado || '—' }}</span>
+          </td>
+          <td class="col-acciones">
+            <button class="btn-icon-sm btn-detail" title="Ver detalles" (click)="verDetalles(a)">
+              <i class="fas fa-eye"></i>
+            </button>
+            <button class="btn-icon-sm btn-report" title="Reporte de actividad" (click)="reporteActividad(a)" *ngIf="a.id_programacion > 0">
+              <i class="fas fa-file-pdf"></i>
+            </button>
+            <button class="btn-icon-sm btn-grupo" title="Crear grupo con los participantes de esta actividad" (click)="crearGrupoDesdeActividad(a)" *ngIf="a.id_programacion > 0">
+              <i class="fas fa-users"></i>
+            </button>
+            <button class="btn-icon-sm btn-fac" title="Asignar facilitadores" (click)="abrirFacilitadores(a)" *ngIf="a.id_programacion > 0">
+              <i class="fas fa-chalkboard-teacher"></i>
+            </button>
+            <button class="btn-icon-sm btn-edit" title="Editar" (click)="abrirEditar(a)">
+              <i class="fas fa-pen"></i>
+            </button>
+            <button class="btn-icon-sm btn-delete" title="Eliminar" (click)="confirmarEliminar(a)">
+              <i class="fas fa-trash"></i>
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  </ng-container>
+
+  <!-- Modal Crear/Editar -->
+  <div class="modal-overlay" *ngIf="mostrarModal" (click)="cerrarModal()">
+    <div class="modal-panel modal-md" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2><i class="fas fa-calendar-alt"></i> {{ editando ? 'Editar actividad' : 'Nueva actividad' }}</h2>
+        <button class="modal-close" (click)="cerrarModal()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert-error" *ngIf="error"><i class="fas fa-exclamation-circle"></i> {{ error }}</div>
+
+        <div class="form-grid">
+          <div class="form-group full">
+            <label>Nombre de la actividad *</label>
+            <input type="text" class="form-input" [(ngModel)]="form.nombre" placeholder="Nombre de la actividad">
+          </div>
+          <div class="form-group full">
+            <label>Descripción</label>
+            <textarea class="form-input" rows="2" [(ngModel)]="form.descripcion" placeholder="Descripción"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Programa</label>
+    <select class="form-input" [(ngModel)]="form.id_programa">
+      <option *ngFor="let p of programasVisibles" [ngValue]="p.id_programa">{{ p.nombre }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Tipo de actividad</label>
+            <select class="form-input" [(ngModel)]="form.id_tipo_actividad">
+              <option *ngFor="let t of tipos" [ngValue]="t.id_tipo_actividad">{{ t.nombre }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Fecha</label>
+            <input type="date" class="form-input" [(ngModel)]="form.fecha">
+          </div>
+          <div class="form-group">
+            <label>Estado</label>
+            <select class="form-input" [(ngModel)]="form.estado">
+              <option *ngFor="let e of estados" [value]="e">{{ e }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Modalidad</label>
+            <select class="form-input" [(ngModel)]="form.modalidad">
+              <option *ngFor="let m of modalidades" [value]="m">{{ m }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Hora inicio</label>
+            <input type="time" class="form-input" [(ngModel)]="form.hora">
+          </div>
+          <div class="form-group">
+            <label>Hora fin</label>
+            <input type="time" class="form-input" [(ngModel)]="form.hora_fin">
+          </div>
+          <div class="form-group">
+            <label>Lugar</label>
+            <input type="text" class="form-input" [(ngModel)]="form.lugar" placeholder="Lugar">
+          </div>
+          <div class="form-group">
+            <label>Participantes planificados</label>
+            <input type="number" class="form-input" [(ngModel)]="form.cantidad_planificada" min="0" placeholder="—">
+          </div>
+          <div class="form-group full">
+            <label>Observaciones</label>
+            <textarea class="form-input" rows="2" [(ngModel)]="form.observaciones" placeholder="Observaciones"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="cerrarModal()" [disabled]="saving">Cancelar</button>
+        <button class="btn btn-navy" (click)="guardar()" [disabled]="saving">
+          <i class="fas" [ngClass]="saving ? 'fa-spinner fa-spin' : 'fa-check'"></i>
+          {{ saving ? 'Guardando...' : (editando ? 'Actualizar' : 'Registrar') }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diálogo confirmación -->
+  <div class="modal-overlay" *ngIf="mostrarDialogo" (click)="mostrarDialogo = false; saving = false">
+      <div class="dialog" [ngClass]="dialogoTipo === 'delete' || dialogoTipo === 'delete-group' || dialogoTipo === 'remove-member' ? 'dialog-danger' : dialogoTipo === 'update' ? 'dialog-warning' : 'dialog-info'"
+         (click)="$event.stopPropagation()">
+      <div class="dialog-icon">
+        <i class="fas" [ngClass]="dialogoTipo === 'delete' || dialogoTipo === 'delete-group' || dialogoTipo === 'remove-member' ? 'fa-exclamation-triangle' : dialogoTipo === 'update' ? 'fa-exclamation-circle' : 'fa-check-circle'"></i>
+      </div>
+      <h3 *ngIf="dialogoTipo === 'create'">¿Registrar actividad?</h3>
+      <h3 *ngIf="dialogoTipo === 'update'">¿Actualizar actividad?</h3>
+      <h3 *ngIf="dialogoTipo === 'delete'">¿Eliminar actividad?</h3>
+      <h3 *ngIf="dialogoTipo === 'delete-group'">¿Eliminar grupo?</h3>
+      <h3 *ngIf="dialogoTipo === 'remove-member'">¿Remover participante?</h3>
+      <p *ngIf="dialogoTipo === 'create'">Se guardará el nuevo registro.</p>
+      <p *ngIf="dialogoTipo === 'update'">Los cambios serán guardados.</p>
+      <p *ngIf="dialogoTipo === 'delete'">Esta acción no se puede deshacer.</p>
+      <p *ngIf="dialogoTipo === 'delete-group'">Se eliminará el grupo <strong>{{ dialogoGrupo?.nombre }}</strong> y sus asignaciones. Esta acción no se puede deshacer.</p>
+      <p *ngIf="dialogoTipo === 'remove-member'"><strong>{{ dialogoGp?.participante_nombre }}</strong> dejará de pertenecer al grupo.</p>
+      <div class="dialog-buttons">
+        <button class="btn btn-outline" (click)="mostrarDialogo = false; saving = false">Cancelar</button>
+        <button class="btn" [ngClass]="dialogoTipo === 'delete' || dialogoTipo === 'delete-group' || dialogoTipo === 'remove-member' ? 'btn-danger' : dialogoTipo === 'update' ? 'btn-warning' : 'btn-success'"
+                (click)="ejecutarAccion()">
+          {{ dialogoTipo === 'delete' || dialogoTipo === 'delete-group' ? 'Eliminar' : dialogoTipo === 'remove-member' ? 'Remover' : dialogoTipo === 'update' ? 'Actualizar' : 'Registrar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Asignar Participantes -->
+  <div class="modal-overlay" *ngIf="mostrarAsignar" (click)="mostrarAsignar = false">
+    <div class="modal-panel modal-md" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2><i class="fas fa-user-plus"></i> Asignar participantes</h2>
+        <button class="modal-close" (click)="mostrarAsignar = false"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <p class="asignar-subtitulo" *ngIf="asignarItem">
+          <strong>{{ asignarItem.nombre }}</strong> — {{ asignarItem.programa || 'Programa' }}
+        </p>
+        <div class="search-box full-width">
+          <i class="fas fa-search"></i>
+          <input type="text" class="form-input" placeholder="Buscar participante..." [(ngModel)]="buscarParticipante">
+        </div>
+        <div class="loading-state" *ngIf="cargandoParticipantes" style="height:100px;">
+          <div class="spinner-sm"></div><span>Cargando participantes...</span>
+        </div>
+        <div class="empty-state" *ngIf="!cargandoParticipantes && participantesFiltrados.length === 0" style="height:100px;">
+          <i class="fas fa-users"></i><p>Sin participantes en este programa</p>
+        </div>
+        <div class="participantes-lista" *ngIf="!cargandoParticipantes && participantesFiltrados.length > 0">
+          <label class="participante-item" *ngFor="let p of participantesFiltrados">
+            <input type="checkbox" [checked]="seleccionados.has(p.id_participante)" (change)="toggleSeleccion(p.id_participante)">
+            <div class="participante-info">
+              <span class="participante-nombre">{{ p.nombre }}</span>
+              <span class="participante-meta">{{ p.categoria || '' }} <span *ngIf="p.dpi"> • DPI: {{ p.dpi }}</span></span>
+            </div>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <span class="seleccion-count">{{ seleccionados.size }} seleccionado(s)</span>
+        <button class="btn btn-outline" (click)="mostrarAsignar = false">Cancelar</button>
+        <button class="btn btn-navy" (click)="guardarAsignacion()">
+          <i class="fas fa-check"></i> Guardar asignación
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Asignar Facilitadores -->
+  <div class="modal-overlay" *ngIf="mostrarFacilitadores" (click)="mostrarFacilitadores = false">
+    <div class="modal-panel modal-md" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2><i class="fas fa-chalkboard-teacher"></i> Asignar facilitadores</h2>
+        <button class="modal-close" (click)="mostrarFacilitadores = false"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <p class="asignar-subtitulo" *ngIf="facilitadorItem">
+          <strong>{{ facilitadorItem.nombre }}</strong> — {{ facilitadorItem.fecha || 'Sin fecha' }}
+        </p>
+        <div class="loading-state" *ngIf="cargandoFacilitadores" style="height:100px;">
+          <div class="spinner-sm"></div><span>Cargando facilitadores...</span>
+        </div>
+        <div class="empty-state" *ngIf="!cargandoFacilitadores && facilitadoresDisponibles.length === 0" style="height:100px;">
+          <i class="fas fa-chalkboard-teacher"></i><p>Sin usuarios con rol Facilitador</p>
+        </div>
+        <div class="participantes-lista" *ngIf="!cargandoFacilitadores && facilitadoresDisponibles.length > 0">
+          <label class="participante-item" *ngFor="let f of facilitadoresDisponibles">
+            <input type="checkbox" [checked]="f.asignado" (change)="toggleFacilitador(f.id_usuario)" class="chk-fac">
+            <div class="participante-info">
+              <span class="participante-nombre">{{ f.nombre }}</span>
+              <span class="participante-meta">@{{ f.usuario || '' }} <span *ngIf="f.correo"> • {{ f.correo }}</span></span>
+            </div>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <span class="seleccion-count">{{ facilitadoresSeleccionados.length }} seleccionado(s)</span>
+        <button class="btn btn-outline" (click)="mostrarFacilitadores = false">Cancelar</button>
+        <button class="btn btn-navy" (click)="guardarFacilitadores()" [disabled]="guardandoFacilitadores">
+          <i class="fas fa-check"></i> {{ guardandoFacilitadores ? 'Guardando...' : 'Guardar asignación' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pestaña Grupos (submódulo dentro de Actividades) -->
+  <section class="grupo-seccion fade-in" *ngIf="pestanaAct === 'grupos'" [class.con-panel]="grupoActivo">
+    <div class="grupo-seccion-head">
+      <h2><i class="fas fa-users"></i> Grupos</h2>
+      <p>Administra los grupos y sus participantes. Los grupos creados aparecen aquí y se usan en Monitoreo &gt; Grupo.</p>
+    </div>
+
+        <!-- Crear grupo -->
+        <div class="grupo-crear-box">
+          <h3><i class="fas fa-plus-circle"></i> Crear grupo</h3>
+          <div class="grupo-crear-grid">
+            <div class="form-group">
+              <label>Programa *</label>
+              <select class="form-input" [(ngModel)]="nuevoGrupo.id_programa">
+                <option [ngValue]="0" disabled>Seleccione un programa</option>
+                <option *ngFor="let p of programasGrupoVisibles" [ngValue]="p.id">{{ p.nombre }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Nombre del grupo *</label>
+              <input type="text" class="form-input" [(ngModel)]="nuevoGrupo.nombre" placeholder="Ej. Grupo Mujeres - Talleres">
+            </div>
+            <div class="form-group">
+              <label>Descripción</label>
+              <input type="text" class="form-input" [(ngModel)]="nuevoGrupo.descripcion" placeholder="Opcional">
+            </div>
+            <div class="form-group grupo-crear-btn">
+              <button class="btn btn-navy" (click)="crearGrupoNuevo()" [disabled]="savingNuevoGrupo">
+                <i class="fas" [ngClass]="savingNuevoGrupo ? 'fa-spinner fa-spin' : 'fa-plus'"></i> Crear grupo
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lista de grupos -->
+        <div class="grupo-lista-head">
+          <span>Grupos ({{ gruposVisibles.length }})</span>
+          <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" class="form-input" placeholder="Buscar grupo..." [(ngModel)]="filtroGrupo">
+          </div>
+        </div>
+
+        <div class="loading-state" *ngIf="gruposCargando" style="height:90px;">
+          <div class="spinner-sm"></div><span>Cargando grupos...</span>
+        </div>
+        <div class="empty-state" *ngIf="!gruposCargando && gruposVisibles.length === 0" style="height:90px;">
+          <i class="fas fa-users"></i><p>Sin grupos creados. Cree uno arriba.</p>
+        </div>
+
+        <div class="grupos-lista" *ngIf="!gruposCargando && gruposVisibles.length > 0">
+          <div class="grupo-row" *ngFor="let g of gruposVisibles" [class.grupo-row-activo]="grupoActivo?.id_grupo === g.id_grupo">
+            <div class="grupo-row-info">
+              <span class="grupo-row-nombre">{{ g.nombre }}</span>
+              <span class="grupo-row-meta">{{ g.programa_nombre || 'Programa' }}<span *ngIf="g.descripcion"> • {{ g.descripcion }}</span></span>
+            </div>
+            <span class="badge badge-teal">{{ g.cantidad_participantes }} participantes</span>
+            <button class="btn-icon-sm btn-grupo" title="Ver / agregar participantes" (click)="abrirMiembros(g)">
+              <i class="fas fa-user-plus"></i>
+            </button>
+            <button class="btn-icon-sm btn-delete" title="Eliminar grupo" (click)="confirmarEliminarGrupo(g)">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Panel miembros del grupo -->
+        <div class="grupo-panel" *ngIf="grupoActivo">
+          <div class="grupo-panel-head">
+            <h3><i class="fas fa-users"></i> {{ grupoActivo.nombre }} <span *ngIf="grupoActivo.programa_nombre">— {{ grupoActivo.programa_nombre }}</span></h3>
+            <button class="btn-icon-sm btn-delete" title="Cerrar panel" (click)="cerrarMiembros()"><i class="fas fa-times"></i></button>
+          </div>
+
+          <div class="grupo-panel-cols">
+            <div class="grupo-col">
+              <h4>Miembros del grupo ({{ miembrosVisibles.length }})</h4>
+              <div class="loading-state" *ngIf="grupoDetalleCargando" style="height:80px;">
+                <div class="spinner-sm"></div><span>Cargando...</span>
+              </div>
+              <div class="empty-state" *ngIf="!grupoDetalleCargando && miembrosVisibles.length === 0" style="height:80px;">
+                <i class="fas fa-user-slash"></i><p>Sin participantes asignados</p>
+              </div>
+              <div class="miembros-lista" *ngIf="!grupoDetalleCargando && miembrosVisibles.length > 0">
+                <div class="miembro-item" *ngFor="let m of miembrosVisibles">
+                  <span class="miembro-nombre">{{ m.participante_nombre }}</span>
+                  <button class="btn-icon-sm btn-delete" title="Remover del grupo" (click)="confirmarRemoverMiembro(m)">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="grupo-col">
+              <h4>Agregar participantes ({{ selAgregarGrupo.size }}/{{ disponiblesFiltrados.length }})</h4>
+              <div class="search-box full-width">
+                <i class="fas fa-search"></i>
+                <input type="text" class="form-input" placeholder="Buscar participante..." [(ngModel)]="filtroPartGrupo">
+              </div>
+              <label class="grupo-todos" *ngIf="disponiblesFiltrados.length > 0">
+                <input type="checkbox" [checked]="todosAgregadosSel" (change)="alternarTodosAgregados()"> Seleccionar todos
+              </label>
+              <div class="loading-state" *ngIf="grupoDetalleCargando" style="height:80px;">
+                <div class="spinner-sm"></div><span>Cargando...</span>
+              </div>
+              <div class="empty-state" *ngIf="!grupoDetalleCargando && disponiblesFiltrados.length === 0" style="height:80px;">
+                <i class="fas fa-check"></i><p>Todos los participantes ya están en el grupo</p>
+              </div>
+              <div class="participantes-lista" *ngIf="!grupoDetalleCargando && disponiblesFiltrados.length > 0">
+                <label class="participante-item" *ngFor="let p of disponiblesFiltrados">
+                  <input type="checkbox" [checked]="selAgregarGrupo.has(p.id_participante)" (change)="toggleAgregarGrupo(p.id_participante)">
+                  <div class="participante-info">
+                    <span class="participante-nombre">{{ nombreParticipante(p) }}</span>
+                    <span class="participante-meta" *ngIf="p.dpi">DPI: {{ p.dpi }}</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="grupo-panel-footer">
+            <span class="seleccion-count">{{ selAgregarGrupo.size }} seleccionado(s)</span>
+            <button class="btn btn-navy" (click)="agregarSeleccionadosGrupo()" [disabled]="agregandoGrupo || grupoDetalleCargando">
+              <i class="fas" [ngClass]="agregandoGrupo ? 'fa-spinner fa-spin' : 'fa-user-plus'"></i> Agregar al grupo
+            </button>
+          </div>
+        </div>
+  </section>
+
+  <!-- Modal Detalles -->
+  <div class="modal-overlay" *ngIf="mostrarDetalles" (click)="mostrarDetalles = false">
+    <div class="modal-panel modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2><i class="fas fa-calendar-check"></i> Detalles de la actividad</h2>
+        <button class="modal-close" (click)="mostrarDetalles = false"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body" *ngIf="detalleItem">
+        <div class="detalle-info">
+          <div class="detalle-field full">
+            <label>Nombre</label>
+            <span class="detalle-valor strong">{{ detalleItem.nombre }}</span>
+          </div>
+          <div class="detalle-field">
+            <label>Estado</label>
+            <span class="badge" [ngClass]="estadoBadge[detalleItem.estado || ''] || 'badge-gray'">{{ detalleItem.estado || '—' }}</span>
+          </div>
+          <div class="detalle-field">
+            <label>Programa</label>
+            <span class="detalle-valor">{{ detalleItem.programa || '—' }}</span>
+          </div>
+          <div class="detalle-field">
+            <label>Modalidad</label>
+            <span class="badge" [ngClass]="detalleItem.modalidad === 'Individual' ? 'badge-purple' : 'badge-teal'">{{ detalleItem.modalidad || 'Grupal' }}</span>
+          </div>
+          <div class="detalle-field">
+            <label>Tipo</label>
+            <span class="detalle-valor">{{ detalleItem.tipo_actividad || '—' }}</span>
+          </div>
+          <div class="detalle-field">
+            <label>Fecha y hora</label>
+            <span class="detalle-valor">{{ detalleItem.fecha || '—' }}<span *ngIf="detalleItem.hora"> {{ hora12(detalleItem.hora) }}</span><span *ngIf="detalleItem.hora_fin"> – {{ hora12(detalleItem.hora_fin) }}</span></span>
+          </div>
+          <div class="detalle-field">
+            <label>Lugar</label>
+            <span class="detalle-valor">{{ detalleItem.lugar || '—' }}</span>
+          </div>
+          <div class="detalle-field">
+            <label>Responsable</label>
+            <span class="detalle-valor">{{ detalleItem.responsable || '—' }}</span>
+          </div>
+          <div class="detalle-field">
+            <label>Planificados</label>
+            <span class="detalle-valor">{{ detalleItem.cantidad_planificada ?? '—' }}</span>
+          </div>
+          <div class="detalle-field">
+            <label>Asignados</label>
+            <span class="detalle-valor strong">{{ cargandoDetalle ? (detalleItem.totalParticipantes ?? 0) : detalleAsignados.length }}</span>
+          </div>
+          <div class="detalle-field full" *ngIf="detalleItem.objetivo">
+            <label>Objetivo</label>
+            <span class="detalle-valor">{{ detalleItem.objetivo }}</span>
+          </div>
+          <div class="detalle-field full" *ngIf="detalleItem.descripcion">
+            <label>Descripción</label>
+            <span class="detalle-valor">{{ detalleItem.descripcion }}</span>
+          </div>
+          <div class="detalle-field full" *ngIf="detalleItem.observaciones">
+            <label>Observaciones</label>
+            <span class="detalle-valor">{{ detalleItem.observaciones }}</span>
+          </div>
+        </div>
+
+        <div class="detalle-seccion">
+          <h3>
+            <i class="fas fa-users"></i> Participantes asignados ({{ cargandoDetalle ? (detalleItem.totalParticipantes ?? 0) : detalleAsignados.length })
+            <span *ngIf="detalleItem && detalleItem.id_programacion > 0" style="font-size:11px;font-weight:400;color:#64748B;margin-left:8px;">
+              <i class="fas fa-clipboard-check"></i> Marca ✓ presente / ✗ ausente
+            </span>
+          </h3>
+          <div class="loading-state" *ngIf="cargandoDetalle" style="height:80px;">
+            <div class="spinner-sm"></div><span>Cargando participantes...</span>
+          </div>
+          <div class="empty-state" *ngIf="!cargandoDetalle && detalleAsignados.length === 0" style="height:80px;">
+            <i class="fas fa-users"></i><p>Sin participantes asignados</p>
+          </div>
+          <ul class="detalle-participantes" *ngIf="!cargandoDetalle && detalleAsignados.length > 0">
+            <li *ngFor="let p of detalleAsignados; let i = index">
+              <span class="participante-num">{{ i + 1 }}</span>
+              <span class="participante-nombre">{{ p.nombre }}</span>
+              <span class="participante-meta">{{ p.categoria || '' }}<span *ngIf="p.dpi"> • DPI: {{ p.dpi }}</span></span>
+              <span *ngIf="detalleItem && detalleItem.id_programacion > 0" style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+                <span class="badge" [ngClass]="asistenciaMap[p.id_participante] === true ? 'badge-success' : asistenciaMap[p.id_participante] === false ? 'badge-inactive' : 'badge-gray'" style="font-size:10px;">
+                  {{ asistenciaTexto(p.id_participante) }}
+                </span>
+                <button type="button" title="Presente" (click)="asistenciaMap[p.id_participante] !== true && toggleAsistencia(p)"
+                  [disabled]="marcandoAsistencia === p.id_participante"
+                  style="width:30px;height:30px;border-radius:8px;border:1px solid #BBF7D0;background:#F0FDF4;color:#15803D;cursor:pointer;font-weight:700;">
+                  ✓
+                </button>
+                <button type="button" title="Ausente" (click)="asistenciaMap[p.id_participante] !== false && toggleAsistencia(p)"
+                  [disabled]="marcandoAsistencia === p.id_participante"
+                  style="width:30px;height:30px;border-radius:8px;border:1px solid #FECACA;background:#FEF2F2;color:#DC2626;cursor:pointer;font-weight:700;">
+                  ✗
+                </button>
+              </span>
+            </li>
+          </ul>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="mostrarDetalles = false">Cerrar</button>
+        <button class="btn btn-navy" (click)="reporteDesdeDetalle()" *ngIf="detalleItem && detalleItem.id_programacion > 0">
+          <i class="fas fa-file-pdf"></i> Generar reporte
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reporte preview -->
+  <app-reporte-preview
+    [visible]="mostrarReporte"
+    [html]="reporteHtml"
+    [titulo]="reporteTitulo"
+    [modoHtml]="true"
+    (cerrarEvent)="mostrarReporte = false">
+  </app-reporte-preview>
+
+  <!-- Toasts -->
+  <div class="toast-container">
+    <div *ngFor="let t of toasts" class="toast" [ngClass]="'toast-' + t.type">
+      <i class="fas" [ngClass]="{'fa-check-circle': t.type === 'success', 'fa-times-circle': t.type === 'error'}"></i>
+      {{ t.message }}
+    </div>
+  </div>
+</app-layout>

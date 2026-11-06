@@ -1,0 +1,361 @@
+<app-layout>
+  <div class="page-header">
+    <div class="header-left">
+      <h4 class="page-title"><i class="fas fa-graduation-cap" style="color: #9333EA; margin-right: 10px;"></i>Registro Académico</h4>
+    </div>
+  </div>
+
+  <div class="academico-layout">
+    <!-- Panel izquierdo -->
+    <div class="panel-left">
+      <div class="panel-header">
+        <h5><i class="fas fa-users"></i> Estudiantes</h5>
+        <button class="btn-icon" (click)="toggleSort()" [title]="sortDir === 'asc' ? 'A→Z' : 'Z→A'">
+          <i class="fas" [class.fa-sort-alpha-down]="sortDir === 'asc'" [class.fa-sort-alpha-up]="sortDir === 'desc'"></i>
+        </button>
+      </div>
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input type="text" [(ngModel)]="search" placeholder="Buscar estudiante...">
+      </div>
+      <div class="participant-list">
+        <div *ngFor="let p of participantesFiltrados" class="participant-item"
+          [class.active]="participanteSeleccionado?.id_participante === p.id_participante"
+          (click)="seleccionarParticipante(p)">
+          <div class="avatar-sm">{{ getIniciales(p) }}</div>
+          <div class="participant-info">
+            <div class="participant-name">{{ p.primer_nombre }} {{ p.segundo_nombre || '' }} {{ p.primer_apellido }} {{ p.segundo_apellido || '' }}</div>
+          </div>
+        </div>
+        <div *ngIf="participantesFiltrados.length === 0" class="empty-list">
+          <i class="fas fa-inbox"></i> Sin estudiantes de Educación
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel derecho -->
+    <div class="panel-right">
+      <!-- Estado vacío -->
+      <div *ngIf="!participanteSeleccionado && !loading" class="empty-state">
+        <i class="fas fa-graduation-cap"></i>
+        <p>Selecciona un estudiante</p>
+        <p class="sub">Elige un participante del programa Educación para ver su historial académico</p>
+      </div>
+
+      <!-- Cargando -->
+      <div *ngIf="loading" class="loading-state">
+        <div class="spinner-sm"></div>
+        <span>Cargando...</span>
+      </div>
+
+      <!-- Estudiante seleccionado -->
+      <div *ngIf="participanteSeleccionado && !loading">
+        <!-- Encabezado estudiante -->
+        <div class="student-header">
+          <div class="avatar-lg">{{ getIniciales(participanteSeleccionado) }}</div>
+          <div class="student-info">
+            <h3>{{ participanteSeleccionado.primer_nombre }} {{ participanteSeleccionado.segundo_nombre || '' }} {{ participanteSeleccionado.primer_apellido }} {{ participanteSeleccionado.segundo_apellido || '' }}</h3>
+            <div class="student-meta">
+              <span *ngIf="participanteSeleccionado.dpi">DPI: {{ participanteSeleccionado.dpi }}</span>
+              <span *ngIf="participanteSeleccionado.categoria_nombre">{{ participanteSeleccionado.categoria_nombre }}</span>
+              <span class="badge badge-success" *ngIf="participanteSeleccionado.estado">Activo</span>
+            </div>
+          </div>
+          <div class="student-actions">
+            <button class="btn btn-navy" (click)="abrirModalInscripcion()"><i class="fas fa-plus"></i> Agregar inscripción</button>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs-bar">
+          <button class="tab-btn" [class.active]="activeTab === 'inscripciones'" (click)="activeTab = 'inscripciones'">
+            <i class="fas fa-school"></i> Inscripciones
+            <span class="tab-count">{{ inscripciones.length }}</span>
+          </button>
+          <button class="tab-btn" [class.active]="activeTab === 'historial'" (click)="activeTab = 'historial'">
+            <i class="fas fa-history"></i> Historial
+            <span class="tab-count">{{ historial.length }}</span>
+          </button>
+        </div>
+
+        <!-- Inscripciones -->
+        <div *ngIf="activeTab === 'inscripciones'">
+          <div *ngFor="let ins of getRegistrosOrdenados()" class="anio-card">
+            <!-- Header AnioCard -->
+            <div class="anio-header">
+              <div class="anio-title">
+                <span class="anio-year">{{ ins.ciclo_anio }}</span>
+                <span class="badge badge-current" *ngIf="ins.ciclo_anio == YEAR.toString()">AÑO ACTUAL</span>
+              </div>
+              <div class="anio-actions">
+                <button class="btn-icon-sm btn-add-cal" title="Agregar calificación" (click)="abrirModalCalificacion(ins)">
+                  <i class="fas fa-pen"></i>
+                </button>
+                <button class="btn-icon-sm" title="Eliminar" (click)="confirmarEliminar('delete-inscripcion', ins.id_inscripcion, 'esta inscripción')">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Info -->
+            <div class="anio-body">
+              <div class="anio-info-grid">
+                <div class="anio-info-item" *ngIf="ins.grado_nombre">
+                  <span class="info-label">Grado</span>
+                  <span class="info-value">{{ ins.grado_nombre }}</span>
+                </div>
+                <div class="anio-info-item" *ngIf="ins.estado">
+                  <span class="info-label">Estado</span>
+                  <span class="badge badge-success">{{ ins.estado }}</span>
+                </div>
+                <div class="anio-info-item" *ngIf="ins.fecha_inscripcion">
+                  <span class="info-label">Fecha inscripción</span>
+                  <span class="info-value">{{ ins.fecha_inscripcion | date:'dd/MM/yyyy' }}</span>
+                </div>
+              </div>
+
+              <!-- Bloques de calificación -->
+              <div class="bloques-section" *ngIf="getPromedios(ins).length > 0">
+                <h6 class="section-subtitle"><i class="fas fa-list-ol"></i> Calificaciones por bloque</h6>
+                <div class="bloques-grid">
+                  <div class="bloque-box" *ngFor="let b of bloques; let i = index">
+                    <span class="bloque-label">{{ b.nombre }}</span>
+                    <span class="bloque-valor" [class.bloque-aprobado]="getBloqueValor(getPromedios(ins), b.numero_bloque) !== null && getBloqueValor(getPromedios(ins), b.numero_bloque)! >= 60"
+                      [class.bloque-reprobado]="getBloqueValor(getPromedios(ins), b.numero_bloque) !== null && getBloqueValor(getPromedios(ins), b.numero_bloque)! < 60"
+                      [class.bloque-vacio]="getBloqueValor(getPromedios(ins), b.numero_bloque) === null">
+                      {{ getBloqueValor(getPromedios(ins), b.numero_bloque) !== null ? (getBloqueValor(getPromedios(ins), b.numero_bloque) | number:'1.1-1') : '—' }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Promedio final -->
+              <div class="promedio-section" *ngIf="calcPromedio(getPromedios(ins)) !== null">
+                <div class="promedio-label">Promedio final</div>
+                <div class="promedio-circle" [class.aprobado]="calcPromedio(getPromedios(ins))! >= 60" [class.reprobado]="calcPromedio(getPromedios(ins))! < 60">
+                  {{ calcPromedio(getPromedios(ins))! | number:'1.1-1' }}
+                </div>
+                <span class="promedio-result" [class.result-aprobado]="calcPromedio(getPromedios(ins))! >= 60" [class.result-reprobado]="calcPromedio(getPromedios(ins))! < 60">
+                  {{ calcPromedio(getPromedios(ins))! >= 60 ? 'APROBADO' : 'REPROBADO' }}
+                </span>
+              </div>
+
+              <div class="anio-observaciones" *ngIf="ins.observaciones">
+                <span class="info-label">Observaciones:</span> {{ ins.observaciones }}
+              </div>
+            </div>
+          </div>
+
+          <div class="empty-tab" *ngIf="inscripciones.length === 0">
+            <i class="fas fa-school"></i>
+            <p>Sin inscripciones registradas</p>
+            <button class="btn btn-navy btn-sm" (click)="abrirModalInscripcion()"><i class="fas fa-plus"></i> Agregar primera inscripción</button>
+          </div>
+        </div>
+
+        <!-- Historial - Automático desde inscripciones + promedios -->
+        <div *ngIf="activeTab === 'historial'">
+          <ng-container *ngFor="let ins of getHistorialAutomatico()">
+            <div class="anio-card">
+              <div class="anio-header">
+                <div class="anio-title">
+                  <span class="anio-year">{{ ins.ciclo_anio }}</span>
+                  <span class="badge badge-current" *ngIf="ins.ciclo_anio == YEAR.toString()">AÑO ACTUAL</span>
+                </div>
+              </div>
+              <div class="anio-body">
+                <div class="anio-info-grid">
+                  <div class="anio-info-item" *ngIf="ins.grado_nombre">
+                    <span class="info-label">Grado</span>
+                    <span class="info-value">{{ ins.grado_nombre }}</span>
+                  </div>
+                  <div class="anio-info-item" *ngIf="calcPromedio(getPromedios(ins)) !== null">
+                    <span class="info-label">Promedio</span>
+                    <span class="bloque-valor" [class.bloque-aprobado]="calcPromedio(getPromedios(ins))! >= 60" [class.bloque-reprobado]="calcPromedio(getPromedios(ins))! < 60">
+                      {{ calcPromedio(getPromedios(ins))! | number:'1.1-1' }}
+                    </span>
+                  </div>
+                  <div class="anio-info-item" *ngIf="calcPromedio(getPromedios(ins)) !== null">
+                    <span class="info-label">Resultado</span>
+                    <span class="badge" [ngClass]="calcPromedio(getPromedios(ins))! >= 60 ? 'badge-success' : 'badge-danger'">
+                      {{ calcPromedio(getPromedios(ins))! >= 60 ? 'Aprobado' : 'Reprobado' }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Bloques -->
+                <div class="bloques-section" *ngIf="getPromedios(ins).length > 0">
+                  <h6 class="section-subtitle"><i class="fas fa-list-ol"></i> Calificaciones por bloque</h6>
+                  <div class="bloques-grid">
+                    <div class="bloque-box" *ngFor="let b of bloques">
+                      <span class="bloque-label">{{ b.nombre }}</span>
+                      <span class="bloque-valor" [class.bloque-aprobado]="getBloqueValor(getPromedios(ins), b.numero_bloque) !== null && getBloqueValor(getPromedios(ins), b.numero_bloque)! >= 60"
+                        [class.bloque-reprobado]="getBloqueValor(getPromedios(ins), b.numero_bloque) !== null && getBloqueValor(getPromedios(ins), b.numero_bloque)! < 60"
+                        [class.bloque-vacio]="getBloqueValor(getPromedios(ins), b.numero_bloque) === null">
+                        {{ getBloqueValor(getPromedios(ins), b.numero_bloque) !== null ? (getBloqueValor(getPromedios(ins), b.numero_bloque) | number:'1.1-1') : '—' }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+
+          <div class="empty-tab" *ngIf="getHistorialAutomatico().length === 0">
+            <i class="fas fa-history"></i>
+            <p>El historial se genera automáticamente al registrar calificaciones</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Inscripción -->
+  <div class="modal-overlay" *ngIf="mostrarModal && modalTipo === 'inscripcion'" (click)="cerrarModal()">
+    <div class="modal-panel" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Nueva Inscripción</h2>
+        <button class="modal-close" (click)="cerrarModal()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert-error" *ngIf="error"><i class="fas fa-exclamation-circle"></i> {{ error }}</div>
+        <div class="form-group"><label>Grado *</label>
+          <select class="form-input" [(ngModel)]="form.id_grado">
+            <option [ngValue]="null">Seleccione...</option>
+            <option *ngFor="let g of grados" [ngValue]="g.id_grado">{{ g.nombre }} ({{ g.nivel }})</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Año del Ciclo Escolar *</label>
+          <input type="number" class="form-input" [(ngModel)]="form.anio"
+                 min="2000" max="2100" placeholder="Ej. 2027">
+          <small style="color:#64748B; font-size:12px;">Escriba el año (ej. 2027). Si es nuevo, se crea automáticamente.</small>
+        </div>
+        <div class="form-group"><label>Observaciones</label>
+          <input type="text" class="form-input" [(ngModel)]="form.observaciones" placeholder="Opcional">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="cerrarModal()">Cancelar</button>
+        <button class="btn btn-navy" (click)="guardar()" [disabled]="saving">
+          <i class="fas fa-check"></i> {{ saving ? 'Guardando...' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Historial - Solo Visualización Automática -->
+  <div class="modal-overlay" *ngIf="mostrarModal && modalTipo === 'historial-visualizacion'" (click)="cerrarModal()">
+    <div class="modal-panel" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2><i class="fas fa-history"></i> Historial Automático</h2>
+        <button class="modal-close" (click)="cerrarModal()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert-info" style="background: #E3F2FD; padding: 12px; border-radius: 8px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; color: #1565C0;">
+          <i class="fas fa-info-circle"></i>
+          <span>Calculado automáticamente desde las calificaciones de los bloques registrados.</span>
+        </div>
+
+        <div *ngIf="particulasSeleccionadoParaHistorial">
+          <h4 style="margin-bottom: 16px;">
+            {{ particulasSeleccionadoParaHistorial.primer_nombre }} {{ particulasSeleccionadoParaHistorial.segundo_nombre || '' }}
+            {{ particulasSeleccionadoParaHistorial.primer_apellido }} {{ particulasSeleccionadoParaHistorial.segundo_apellido || '' }}
+          </h4>
+
+          <div class="promedio-vivo-panel" *ngIf="promedioCalculadoHistorico !== null" style="display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px; background: #F5F5F5; border-radius: 12px;">
+            <span class="promedio-vivo-label" style="font-weight: 600; color: #555;">Promedio automático</span>
+            <div class="promedio-circle" [class.aprobado]="promedioCalculadoHistorico >= 60" [class.reprobado]="promedioCalculadoHistorico < 60" style="width: 80px; height: 80px; font-size: 28px;">
+              {{ promedioCalculadoHistorico | number:'1.1-1' }}
+            </div>
+            <span class="promedio-result" [class.result-aprobado]="promedioCalculadoHistorico >= 60" [class.result-reprobado]="promedioCalculadoHistorico < 60" style="font-size: 18px; font-weight: 700;">
+              {{ promedioCalculadoHistorico >= 60 ? 'APROBADO' : 'REPROBADO' }}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="cerrarModal()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Calificación por Bloques -->
+  <div class="modal-overlay" *ngIf="mostrarModal && modalTipo === 'calificacion'" (click)="cerrarModal()">
+    <div class="modal-panel modal-wide" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Calificaciones por Bloque</h2>
+        <button class="modal-close" (click)="cerrarModal()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert-error" *ngIf="error"><i class="fas fa-exclamation-circle"></i> {{ error }}</div>
+
+        <div class="cal-info" *ngIf="inscripcionSeleccionada">
+          <span><strong>Ciclo:</strong> {{ inscripcionSeleccionada.ciclo_anio }}</span>
+          <span><strong>Grado:</strong> {{ inscripcionSeleccionada.grado_nombre }}</span>
+        </div>
+
+        <div class="form-section-title"><i class="fas fa-list-ol"></i> Calificaciones por bloque</div>
+        <div class="bloques-form-grid">
+          <div class="bloque-form-item">
+            <label>Bloque I</label>
+            <input type="number" class="form-input" [(ngModel)]="formCalificacion.bloque_i"
+              (ngModelChange)="onBloqueChange()" min="0" max="100" step="0.1" placeholder="—">
+          </div>
+          <div class="bloque-form-item">
+            <label>Bloque II</label>
+            <input type="number" class="form-input" [(ngModel)]="formCalificacion.bloque_ii"
+              (ngModelChange)="onBloqueChange()" min="0" max="100" step="0.1" placeholder="—">
+          </div>
+          <div class="bloque-form-item">
+            <label>Bloque III</label>
+            <input type="number" class="form-input" [(ngModel)]="formCalificacion.bloque_iii"
+              (ngModelChange)="onBloqueChange()" min="0" max="100" step="0.1" placeholder="—">
+          </div>
+          <div class="bloque-form-item">
+            <label>Bloque IV</label>
+            <input type="number" class="form-input" [(ngModel)]="formCalificacion.bloque_iv"
+              (ngModelChange)="onBloqueChange()" min="0" max="100" step="0.1" placeholder="—">
+          </div>
+        </div>
+
+        <!-- Panel de promedio en vivo -->
+        <div class="promedio-vivo-panel" *ngIf="promedioVivo !== null">
+          <span class="promedio-vivo-label">Promedio calculado:</span>
+          <div class="promedio-circle" [class.aprobado]="promedioVivo >= 60" [class.reprobado]="promedioVivo < 60">
+            {{ promedioVivo | number:'1.1-1' }}
+          </div>
+          <span class="promedio-result" [class.result-aprobado]="promedioVivo >= 60" [class.result-reprobado]="promedioVivo < 60">
+            {{ promedioVivo >= 60 ? 'APROBADO' : 'REPROBADO' }}
+          </span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="cerrarModal()">Cancelar</button>
+        <button class="btn btn-navy" (click)="guardarCalificacion()" [disabled]="saving">
+          <i class="fas fa-check"></i> {{ saving ? 'Guardando...' : 'Guardar calificaciones' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diálogo confirmación -->
+  <div class="modal-overlay" *ngIf="mostrarConfirmacion" (click)="mostrarConfirmacion = false">
+    <div class="dialog dialog-danger" (click)="$event.stopPropagation()">
+      <div class="dialog-icon"><i class="fas fa-exclamation-triangle"></i></div>
+      <h3>¿Eliminar registro?</h3>
+      <p>Se eliminará {{ confirmNombre }}. Esta acción no se puede deshacer.</p>
+      <div class="dialog-buttons">
+        <button class="btn btn-outline" (click)="mostrarConfirmacion = false">Cancelar</button>
+        <button class="btn btn-danger" (click)="ejecutarEliminar()">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast-container">
+    <div *ngFor="let t of toasts" class="toast" [ngClass]="'toast-' + t.type">
+      <i class="fas" [ngClass]="{'fa-check-circle': t.type === 'success', 'fa-times-circle': t.type === 'error'}"></i>
+      {{ t.message }}
+    </div>
+  </div>
+</app-layout>

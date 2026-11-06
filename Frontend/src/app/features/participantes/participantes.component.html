@@ -1,0 +1,297 @@
+<app-layout>
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <h4 class="page-title"><i class="fas fa-users" style="color: #b8e7eb; margin-right: 10px;"></i>Participantes</h4>
+    </div>
+    <div class="header-actions">
+      <div class="dropdown">
+        <button class="btn btn-outline dropdown-toggle"><i class="fas fa-file-alt"></i> Reporte</button>
+        <ul class="dropdown-menu">
+          <li><a class="dropdown-item" (click)="generarReporte('general')"><i class="fas fa-list me-2"></i>General</a></li>
+          <li><a class="dropdown-item" (click)="generarReporte('activos')"><i class="fas fa-check me-2"></i>Solo activos</a></li>
+          <li><a class="dropdown-item" (click)="generarReporte('inactivos')"><i class="fas fa-times me-2"></i>Solo inactivos</a></li>
+        </ul>
+      </div>
+      <button class="btn btn-navy" (click)="abrirCrear()"><i class="fas fa-plus"></i> Nuevo participante</button>
+    </div>
+  </div>
+
+  <!-- Sub-tabs -->
+  <app-programas-tabs [activo]="subTab" (activoChange)="cambiarSubTab($event)" [conteos]="conteoTabs"></app-programas-tabs>
+
+  <!-- Filtros -->
+  <div class="filters-bar">
+    <div class="filters-row">
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input type="text" [(ngModel)]="search" (input)="filtrar()" placeholder="Buscar por nombre...">
+      </div>
+      <select class="filter-select" [(ngModel)]="fCategoria" (change)="filtrar()">
+        <option value="">Categoría</option>
+        <option *ngFor="let c of catNames" [value]="c">{{ c }}</option>
+      </select>
+      <select class="filter-select" [(ngModel)]="fGenero" (change)="filtrar()">
+        <option value="">Género</option>
+        <option *ngFor="let g of generos" [value]="g">{{ g }}</option>
+      </select>
+      <select class="filter-select" [(ngModel)]="fEstado" (change)="filtrar()">
+        <option value="">Estado</option>
+        <option value="activo">Activo</option>
+        <option value="inactivo">Inactivo</option>
+      </select>
+      <select class="filter-select" [(ngModel)]="fBeca" (change)="filtrar()">
+        <option value="">Beca</option>
+        <option value="beca">Con beca</option>
+        <option value="sin">Sin beca</option>
+      </select>
+      <button class="btn btn-sm btn-outline" (click)="toggleSort()">
+        <i class="fas" [class.fa-sort-amount-down]="sortDir === 'asc'" [class.fa-sort-amount-up]="sortDir === 'desc'"></i>
+        {{ sortDir === 'asc' ? 'A→Z' : 'Z→A' }}
+      </button>
+      <button class="btn btn-sm btn-outline" *ngIf="hasFilters" (click)="limpiarFiltros()">
+        <i class="fas fa-times"></i> Limpiar
+      </button>
+    </div>
+    <div class="filter-count">
+      {{ participantesFiltrados.length }} de {{ byPrograma.length }} participantes — <strong [style.color]="activeTabMeta.color">{{ activeTabMeta.label }}</strong>
+    </div>
+  </div>
+
+  <!-- Tabla -->
+  <div class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Participante</th>
+          <th>Programa</th>
+          <th>Categoría</th>
+          <th>Beca</th>
+          <th>Edad</th>
+          <th>Género</th>
+          <th>Estado</th>
+          <th class="text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let p of participantesFiltrados; let i = index" [style.animation-delay]="(i * 0.03) + 's'" class="fade-in-row">
+          <td>
+            <div class="user-cell">
+              <div class="avatar-circle" *ngIf="!p.fotografia_ruta" [style.background]="p.sexo === 'Femenino' ? '#9333EA' : '#1E3278'">{{ getInitials(p) }}</div>
+              <img *ngIf="p.fotografia_ruta" [src]="participanteService.getFotoUrl(p.fotografia_ruta)" class="avatar-photo" (error)="p.fotografia_ruta = ''">
+              <div>
+                <div class="fw-semibold">{{ p.primer_nombre }} {{ p.segundo_nombre || '' }} {{ p.primer_apellido }} {{ p.segundo_apellido || '' }}</div>
+                <div class="text-muted small" *ngIf="p.correo">{{ p.correo }}</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="badge" [ngClass]="getProgramaBadge(p)">{{ p.programa_nombre }}</span></td>
+          <td>{{ p.categoria_nombre }}</td>
+          <td>
+            <span *ngIf="p.beca" class="badge badge-success">Sí — Q{{ p.monto_beca | number:'1.2-2' }}</span>
+            <span *ngIf="!p.beca" class="badge badge-inactive">No</span>
+          </td>
+          <td>{{ calcEdad(p.fecha_nacimiento) }} años</td>
+          <td>{{ p.sexo }}</td>
+          <td><span class="badge" [ngClass]="p.estado ? 'badge-success' : 'badge-inactive'">{{ p.estado ? 'Activo' : 'Inactivo' }}</span></td>
+          <td class="text-center">
+            <div class="action-btns">
+              <button class="action-btn view" title="Ver expediente" (click)="verPerfil(p)"><i class="fas fa-eye"></i></button>
+              <button class="action-btn download" title="Descargar reporte" (click)="descargarReporte(p)"><i class="fas fa-download"></i></button>
+              <button class="action-btn edit" title="Editar" (click)="abrirEditar(p)"><i class="fas fa-pen"></i></button>
+              <button class="action-btn delete" title="Eliminar" (click)="eliminar(p)"><i class="fas fa-trash"></i></button>
+            </div>
+          </td>
+        </tr>
+        <tr *ngIf="participantesFiltrados.length === 0">
+          <td colspan="8" class="empty-cell"><i class="fas fa-inbox"></i> No se encontraron participantes</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Modal Crear/Editar -->
+  <div class="modal-overlay" *ngIf="mostrarModal" (click)="cerrarModal()">
+    <div class="modal-panel modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ editando ? 'Editar' : 'Registrar' }} participante</h2>
+        <button class="modal-close" (click)="cerrarModal()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert-error" *ngIf="error"><i class="fas fa-exclamation-circle"></i> {{ error }}</div>
+
+        <!-- Foto -->
+        <div class="text-center mb-4">
+          <div class="photo-upload" (click)="photoInput.click()">
+            <img *ngIf="form.fotografia_preview" [src]="form.fotografia_preview" class="photo-preview">
+            <ng-container *ngIf="!form.fotografia_preview">
+              <i class="fas fa-camera"></i><span>Foto</span>
+            </ng-container>
+          </div>
+          <input #photoInput type="file" accept="image/*" (change)="onPhotoSelected($event)" style="display:none;">
+        </div>
+
+        <!-- Datos Personales -->
+        <div class="form-section-title"><i class="fas fa-user"></i> Datos Personales</div>
+        <div class="form-grid">
+          <div class="form-group"><label>Primer nombre *</label><input type="text" class="form-input" [(ngModel)]="form.primer_nombre"></div>
+          <div class="form-group"><label>Segundo nombre</label><input type="text" class="form-input" [(ngModel)]="form.segundo_nombre"></div>
+          <div class="form-group"><label>Primer apellido *</label><input type="text" class="form-input" [(ngModel)]="form.primer_apellido"></div>
+          <div class="form-group"><label>Segundo apellido</label><input type="text" class="form-input" [(ngModel)]="form.segundo_apellido"></div>
+          <div class="form-group">
+            <label>Fecha de nacimiento</label>
+            <input type="date" class="form-input" [(ngModel)]="form.fecha_nacimiento">
+            <span class="age-text" *ngIf="edadCalculada !== null" [style.color]="esMenor ? '#B45309' : '#15803D'">
+              {{ edadCalculada }} años <span *ngIf="esMenor">— MENOR DE EDAD</span>
+            </span>
+          </div>
+          <div class="form-group">
+            <label>Género</label>
+            <select class="form-input" [(ngModel)]="form.sexo">
+              <option value="">Seleccione...</option>
+              <option value="Masculino">Masculino</option>
+              <option value="Femenino">Femenino</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+          <div class="form-group"><label>DPI</label><input type="text" class="form-input" [(ngModel)]="form.dpi"></div>
+          <div class="form-group"><label>Estado</label>
+            <select class="form-input" [(ngModel)]="form.estado">
+              <option [ngValue]="true">Activo</option>
+              <option [ngValue]="false">Inactivo</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Categoría y Programa -->
+        <div class="form-section-title"><i class="fas fa-folder"></i> Categoría y Programa</div>
+        <div class="form-grid">
+          <div class="form-group"><label>Categoría *</label>
+            <select class="form-input" [(ngModel)]="form.id_categoria">
+              <option *ngFor="let c of categorias" [ngValue]="c.id">{{ c.nombre }}</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Programa *</label>
+            <select class="form-input" [(ngModel)]="form.id_programa">
+              <option *ngFor="let p of programasVisibles" [ngValue]="p.id">{{ p.nombre }}</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Beca -->
+        <div class="form-section-title"><i class="fas fa-hand-holding-usd"></i> Beca</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Tiene beca</label>
+            <select class="form-input" [(ngModel)]="form.beca">
+              <option [ngValue]="false">No</option>
+              <option [ngValue]="true">Sí</option>
+            </select>
+          </div>
+          <div class="form-group" *ngIf="form.beca">
+            <label>Monto de la beca (Q)</label>
+            <input type="number" class="form-input" [(ngModel)]="form.monto_beca" min="0" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+
+        <!-- Contacto -->
+        <div class="form-section-title"><i class="fas fa-phone"></i> Contacto</div>
+        <div class="form-grid">
+          <div class="form-group"><label>Teléfono</label><input type="text" class="form-input" [(ngModel)]="form.contacto.telefono_principal"></div>
+          <div class="form-group"><label>Correo</label><input type="email" class="form-input" [(ngModel)]="form.contacto.correo"></div>
+          <div class="form-group form-group-full"><label>Dirección</label><input type="text" class="form-input" [(ngModel)]="form.direccion.direccion"></div>
+          <div class="form-group"><label>Comunidad</label>
+            <select class="form-input" [(ngModel)]="form.id_comunidad">
+              <option [ngValue]="null">Sin comunidad</option>
+              <option *ngFor="let c of comunidades" [ngValue]="c.id">{{ c.nombre }}</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Contacto de emergencia</label><input type="text" class="form-input" [(ngModel)]="form.contacto.contacto_emergencia"></div>
+          <div class="form-group"><label>Tel. emergencia</label><input type="text" class="form-input" [(ngModel)]="form.contacto.telefono_emergencia"></div>
+        </div>
+
+        <!-- Tutor/Encargado (Condicional) -->
+        <ng-container *ngIf="mostrarPadres">
+          <div class="form-section-title"><i class="fas fa-user-tie"></i>
+            Datos del padre, madre o encargado
+            <span *ngIf="esMenor" style="color: #B45309; font-size: 12px;">⚠ Menor de edad</span>
+          </div>
+          <div *ngFor="let f of form.familiares; let i = index" class="familiar-card">
+            <div class="familiar-header" *ngIf="form.familiares.length > 1">
+              <span>Encargado {{ i + 1 }}</span>
+              <button class="btn-icon delete" (click)="eliminarFamiliar(i)"><i class="fas fa-trash"></i></button>
+            </div>
+            <div class="form-grid">
+              <div class="form-group"><label>Primer nombre *</label><input type="text" class="form-input" [(ngModel)]="f.primer_nombre"></div>
+              <div class="form-group"><label>Segundo nombre</label><input type="text" class="form-input" [(ngModel)]="f.segundo_nombre"></div>
+              <div class="form-group"><label>Primer apellido</label><input type="text" class="form-input" [(ngModel)]="f.primer_apellido"></div>
+              <div class="form-group"><label>Segundo apellido</label><input type="text" class="form-input" [(ngModel)]="f.segundo_apellido"></div>
+              <div class="form-group"><label>Parentesco</label>
+                <select class="form-input" [(ngModel)]="f.parentesco">
+                  <option value="">Seleccione...</option>
+                  <option value="Madre">Madre</option>
+                  <option value="Padre">Padre</option>
+                  <option value="Tutor">Tutor</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </div>
+              <div class="form-group"><label>DPI</label><input type="text" class="form-input" [(ngModel)]="f.dpi"></div>
+              <div class="form-group"><label>Teléfono</label><input type="text" class="form-input" [(ngModel)]="f.telefono"></div>
+              <div class="form-group"><label>Correo</label><input type="email" class="form-input" [(ngModel)]="f.correo"></div>
+            </div>
+          </div>
+          <button class="btn btn-outline btn-sm" (click)="agregarFamiliar()" style="margin-top: 8px;">
+            <i class="fas fa-plus"></i> Agregar encargado
+          </button>
+        </ng-container>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="cerrarModal()">Cancelar</button>
+        <button class="btn btn-navy" (click)="guardar()" [disabled]="saving">
+          <i class="fas" [class.fa-check]="!editando" [class.fa-save]="editando"></i>
+          {{ editando ? 'Actualizar' : 'Registrar participante' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dialogo Confirmación -->
+  <div class="modal-overlay" *ngIf="mostrarDialogo" (click)="mostrarDialogo = false">
+    <div class="dialog scale-in" [ngClass]="{'dialog-danger': dialogoTipo === 'delete'}" (click)="$event.stopPropagation()">
+      <div class="dialog-icon">
+        <i class="fas" [ngClass]="{'fa-check-circle': dialogoTipo === 'create', 'fa-exclamation-triangle': dialogoTipo === 'update', 'fa-trash': dialogoTipo === 'delete'}"></i>
+      </div>
+      <h3 class="dialog-title">
+        {{ dialogoTipo === 'create' ? '¿Registrar participante?' : dialogoTipo === 'update' ? '¿Actualizar participante?' : '¿Eliminar participante?' }}
+      </h3>
+      <p class="dialog-message">
+        {{ dialogoTipo === 'create' ? 'Se guardará el nuevo registro.' : dialogoTipo === 'update' ? 'Los cambios serán guardados.' : 'Esta acción no se puede deshacer.' }}
+      </p>
+      <div class="dialog-buttons">
+        <button class="btn-dialog btn-cancel" (click)="mostrarDialogo = false">Cancelar</button>
+        <button class="btn-dialog" [ngClass]="{'btn-info': dialogoTipo === 'create', 'btn-warning': dialogoTipo === 'update', 'btn-delete': dialogoTipo === 'delete'}" (click)="ejecutarAccion()">
+          {{ dialogoTipo === 'create' ? 'Registrar' : dialogoTipo === 'update' ? 'Actualizar' : 'Eliminar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast-container">
+    <div *ngFor="let t of toasts" class="toast" [ngClass]="'toast-' + t.type">
+      <i class="fas" [ngClass]="{'fa-check-circle': t.type === 'success', 'fa-times-circle': t.type === 'error'}"></i>
+      {{ t.message }}
+    </div>
+  </div>
+
+  <!-- Report Preview Modal -->
+  <app-reporte-preview
+    [visible]="mostrarReporte"
+    [html]="reporteHtml"
+    [tipo]="reporteTipo"
+    [participantes]="reporteLista"
+    [titulo]="reporteTitulo"
+    (cerrarEvent)="mostrarReporte = false">
+  </app-reporte-preview>
+</app-layout>
